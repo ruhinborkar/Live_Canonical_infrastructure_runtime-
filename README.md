@@ -1,6 +1,5 @@
 # Live_Canonical_infrastructure_runtime-
-
-## System Overview
+System Overview
 
 The Live Canonical Infrastructure Runtime is a deterministic execution platform that records runtime events, persists them through append-only storage, reconstructs execution state from historical logs, validates integrity through executable replay, detects runtime corruption, and supports deterministic recovery from interrupted execution paths.
 
