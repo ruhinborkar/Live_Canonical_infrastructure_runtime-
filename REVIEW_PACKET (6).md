@@ -1,167 +1,155 @@
 
 # REVIEW PACKET
 
-# REVIEW PACKET
+## 1. ENTRY POINT
 
-## Project
+run_system.py
 
-LIVE Canonical Infrastructure Runtime
+Supported execution modes:
 
----
+python run_system.py --mode live
 
-# 1. Executive Summary
+python run_system.py --mode replay
 
-This repository implements a deterministic infrastructure runtime designed to validate replay integrity, event sequencing, corruption detection, recovery verification, and operational observability through a unified canonical architecture.
+python run_system.py --mode recover
 
-The objective of this project was to converge previously isolated infrastructure components into a single runtime capable of maintaining reproducible execution history and deterministic replay behavior.
-
-The resulting system provides:
-
-* Canonical serialization
-* Deterministic hashing
-* Persistent sequence management
-* Append-only event persistence
-* Replay validation
-* Corruption simulation
-* Recovery verification
-* Runtime observability
+python run_system.py --mode verify
 
 ---
 
-# 2. Reviewer Objective
+## 2. RECONSTRUCTION FLOW
 
-The purpose of this review is to verify that the runtime can:
+Append-Only Persistence
 
-1. Generate deterministic runtime events
-2. Assign persistent sequence identifiers
-3. Serialize events canonically
-4. Generate reproducible lineage hashes
-5. Persist events through append-only logging
-6. Simulate corruption scenarios
-7. Trigger recovery workflows
-8. Expose runtime state through observability outputs
+↓
 
----
+Runtime Reconstruction
 
-# 3. Repository Convergence
+↓
 
-This implementation represents the convergence of multiple deterministic infrastructure concepts into a single canonical runtime.
+Replay Execution
 
-The convergence effort focused on eliminating:
+↓
 
-* fragmented runtime flows
-* duplicated infrastructure logic
-* isolated replay implementations
-* disconnected observability layers
-* inconsistent persistence mechanisms
+Recovery Analysis
 
-The final architecture establishes:
+↓
 
-* one runtime execution flow
-* one persistence layer
-* one sequence management layer
-* one hashing layer
-* one replay validation path
-* one recovery workflow
-* one observability framework
+Runtime Verification
 
----
+↓
 
-# 4. Runtime Execution Flow
+Observability
 
-The runtime executes through the following deterministic pipeline:
+### Runtime Components
 
-Event Creation
+AppendOnlyStore
 
-→ Validation
+RuntimeReconstructor
 
-→ Canonical Serialization
+RuntimeReplayer
 
-→ Lineage Hash Generation
+InterruptedRecovery
 
-→ Persistent Sequence Assignment
+FailurePathExecutor
 
-→ Append-Only Persistence
-
-→ Replay Validation
-
-→ Corruption Injection
-
-→ Recovery Verification
-
-→ Observability Reporting
-
-Each stage is observable and produces traceable execution output.
+RuntimeObserver
 
 ---
 
-# 5. Core Components Reviewed
+## 3. REAL EXECUTION PROOF
 
-## Canonical Serializer
+Replay Execution Output
 
-Location:
+{
+"events_replayed": 2,
+"hashes_recomputed": 2,
+"runtime_states_rebuilt": 2,
+"verification_result": "REPLAY_VERIFIED"
+}
 
-serialization/canonical_serializer.py
+Recovery Execution Output
 
-Purpose:
-
-* deterministic JSON serialization
-* field-order normalization
-* replay consistency
-
----
-
-## Runtime Hasher
-
-Location:
-
-hashing/runtime_hasher.py
-
-Purpose:
-
-* SHA-256 lineage generation
-* event integrity validation
-* replay verification support
-
----
-
-## Sequence Manager
-
-Location:
-
-persistence/sequence_manager.py
-
-Purpose:
-
-* persistent sequence allocation
-* deterministic event ordering
-* replay chronology enforcement
-
-Validation Result:
-
-Sequence IDs increase deterministically across executions.
-
-Example:
-
-1 → 2 → 3 → 4 → 5
-
-This prevents replay ambiguity and duplicate event ordering.
+{
+"execution_interrupted": true,
+"broken_sequence_continuity": true,
+"missing_sequences": [
+2,
+3,
+4,
+5,
+6,
+7,
+8
+],
+"duplicate_sequences": [
+9
+],
+"resume_point": 2,
+"recovery_outcome": "RECOVERY_REQUIRED"
+}
 
 ---
 
-## Append-Only Store
+## 4. FAILURE EXECUTION PROOF
 
-Location:
+Hostile Runtime Validation Output
 
-persistence/append_only_store.py
+* DUPLICATE_PACKET
+* SEQUENCE_CORRUPTION
+* TRACE_MUTATION
+* INVALID_SCHEMA
+* PARTIAL_REPLAY_CORRUPTION
 
-Purpose:
+Observed Causes
 
-* immutable event persistence
-* replay source generation
-* runtime history retention
+* Duplicate sequence identifiers detected
+* Missing sequence continuity detected
+* Trace lineage mutation detected
+* Schema validation failure detected
+* Partial replay reconstruction detected
 
-Generated Logs:
+---
+
+## 5. WHAT CHANGED
+
+### Runtime Reconstruction Added
+
+runtime_reconstructor.py
+
+Deterministic runtime state reconstruction from append-only persisted logs.
+
+### Executable Replay Added
+
+runtime_replayer.py
+
+Replay validation based on reconstructed runtime truth.
+
+### Recovery Analysis Added
+
+interrupted_recovery.py
+
+Interrupted execution analysis and deterministic recovery outcome generation.
+
+### Serializer Hardening Added
+
+Canonical serialization validation against hostile payload ordering.
+
+### Failure Execution Added
+
+Executable hostile runtime validation scenarios.
+
+### Unified Runtime Delivery Added
+
+run_system.py
+
+Single execution entry point supporting live, replay, recovery, and verification modes.
+
+---
+
+## 6. PROOF ARTIFACTS
+
+### Runtime Logs
 
 logging/logs/live_execution.jsonl
 
@@ -169,187 +157,34 @@ logging/logs/replay_log.jsonl
 
 logging/logs/recovery_log.jsonl
 
----
+### Runtime Reports
 
-## Corruption Runtime
+observability/final_runtime_report.json
 
-Location:
+observability/corruption_report.json
 
-replay/runtime_corruption.py
+observability/recovery_report.json
 
-Purpose:
+### Console Outputs
 
-* replay divergence simulation
-* sequence corruption testing
+LIVE EXECUTION COMPLETE
 
-Example:
+REPLAY_VERIFIED
 
-Original:
+RECOVERY_REQUIRED
 
-sequence_id = 5
-
-Corrupted:
-
-sequence_id = 999
+Structured hostile validation outputs
 
 ---
 
-## Recovery Runtime
-
-Location:
-
-recovery/runtime_recovery.py
-
-Purpose:
-
-* integrity assessment
-* recovery workflow validation
-* compromised state reporting
-
----
-
-## Observability Runtime
-
-Location:
-
-observability/runtime_observer.py
-
-Purpose:
-
-* execution visibility
-* runtime state monitoring
-* corruption reporting
-* recovery reporting
-
----
-
-# 6. End-to-End Validation
-
-Primary Validation File:
-
-tests/test_end_to_end_runtime.py
-
-Execution:
-
-python tests/test_end_to_end_runtime.py
-
-The validation workflow performs:
-
-* runtime event generation
-* canonical serialization
-* deterministic hashing
-* sequence assignment
-* append-only persistence
-* corruption injection
-* recovery validation
-* observability reporting
-
----
-
-# 7. Example Runtime Output
-
-END-TO-END LIVE FLOW STARTED
-
-[OBSERVABILITY] STAGE=INPUT | STATUS=EVENT_RECEIVED
-
-[OBSERVABILITY] STAGE=VALIDATION | STATUS=PASSED
-
-[OBSERVABILITY] STAGE=SERIALIZATION | STATUS=COMPLETED
-
-[OBSERVABILITY] STAGE=HASHING | STATUS=HASH_GENERATED
-
-[OBSERVABILITY] STAGE=PERSISTENCE | STATUS=APPEND_ONLY_WRITE
-
-[OBSERVABILITY] STAGE=REPLAY | STATUS=COMPLETED
-
-[OBSERVABILITY] STAGE=CORRUPTION | STATUS=SEQUENCE_CORRUPTED
-
-[OBSERVABILITY] STAGE=VERIFICATION | STATUS=COMPROMISED
-
-[OBSERVABILITY] STAGE=RECOVERY | STATUS=RECOVERY_REQUIRED
-
-[OBSERVABILITY] STAGE=OBSERVABILITY | STATUS=REPORT_GENERATED
-
-END-TO-END LIVE FLOW COMPLETE
-
----
-
-# 8. Validation Outcomes
-
-The reviewer should observe:
-
-✓ Deterministic serialization
-
-✓ Stable lineage hashing
-
-✓ Persistent sequence allocation
-
-✓ Append-only event logging
-
-✓ Replay validation execution
-
-✓ Corruption detection
-
-✓ Recovery workflow activation
-
-✓ Runtime observability output
-
----
-
-# 9. Generated Runtime Artifacts
-
-Sequence State:
-
-logging/logs/sequence_state.json
-
-Runtime Logs:
-
-logging/logs/live_execution.jsonl
-
-logging/logs/replay_log.jsonl
-
-logging/logs/recovery_log.jsonl
-
-These artifacts provide evidence of runtime execution, sequence progression, and persistence behavior.
-
----
-
-# 10. Reviewer Verification Checklist
-
-The reviewer can validate the system by:
-
-1. Cloning the repository
-
-2. Running the end-to-end validation
-
-3. Inspecting generated runtime logs
-
-4. Confirming sequence progression
-
-5. Confirming append-only persistence
-
-6. Observing corruption detection
-
-7. Observing recovery validation
-
-8. Reviewing observability output
-
-9. Verifying deterministic execution behavior
-
----
-
-# 11. Final Outcome
-
-The repository delivers a unified deterministic infrastructure runtime capable of:
-
-* reproducible event execution
-* persistent sequence management
-* append-only replay persistence
-* deterministic replay validation
-* corruption detection
-* recovery verification
-* operational observability
-
-through a single canonical runtime architecture.
-
-
+## Reviewer Validation Procedure
+
+1. Execute live runtime mode
+2. Execute replay mode
+3. Execute recovery mode
+4. Execute verification mode
+5. Review generated outputs
+6. Review runtime logs
+7. Validate deterministic behavior
+
+Expected validation time: under 10 minutes.

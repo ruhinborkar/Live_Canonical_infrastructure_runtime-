@@ -1,0 +1,2 @@
+{"trace_id": "TRACE-END-TO-END", "event_timestamp": "2026-06-03T14:07:15.242759+00:00", "event_type": "LIVE_RUNTIME_EVENT", "payload": {"signal": "ACTIVE", "temperature": 90}, "runtime_state": "OPERATIONAL", "sequence_id": 1}
+{"trace_id": "FINAL-VALIDATION", "event_timestamp": "2026-06-03T14:07:17.023929+00:00", "event_type": "FINAL_RUNTIME_EVENT", "payload": {"signal": "ACTIVE", "temperature": 90}, "runtime_state": "OPERATIONAL", "sequence_id": 9}

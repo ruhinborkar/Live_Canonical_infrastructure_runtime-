@@ -1,0 +1,5 @@
+{
+    "corruption_detected": true,
+    "corrupted_sequence_id": 999,
+    "reason": "SEQUENCE_DIVERGENCE_DETECTED"
+}

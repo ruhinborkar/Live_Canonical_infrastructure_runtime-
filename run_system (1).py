@@ -1,10 +1,25 @@
 
 import argparse
+import json
 
-from canonical_infrastructure_runtime.observability.runtime_observer import RuntimeObserver
+from observability.runtime_observer import (
+    RuntimeObserver
+)
+
+from replay.runtime_replayer import (
+    RuntimeReplayer
+)
+
+from recovery.interrupted_recovery import (
+    InterruptedRecovery
+)
+
+from validation.failure_path_executor import (
+    FailurePathExecutor
+)
 
 
-def execute_runtime():
+def run_live():
 
     RuntimeObserver.observe(
         "INPUT",
@@ -33,7 +48,7 @@ def execute_runtime():
 
     RuntimeObserver.observe(
         "VERIFICATION",
-        "True"
+        "TRUE"
     )
 
     RuntimeObserver.observe(
@@ -42,7 +57,49 @@ def execute_runtime():
     )
 
     print(
-        "\nRUNTIME EXECUTION COMPLETE"
+        "\nLIVE EXECUTION COMPLETE"
+    )
+
+
+def run_replay():
+
+    result = (
+        RuntimeReplayer.execute_replay()
+    )
+
+    print(
+        json.dumps(
+            result,
+            indent=4
+        )
+    )
+
+
+def run_recover():
+
+    result = (
+        InterruptedRecovery.analyze_interruption()
+    )
+
+    print(
+        json.dumps(
+            result,
+            indent=4
+        )
+    )
+
+
+def run_verify():
+
+    result = (
+        FailurePathExecutor.execute()
+    )
+
+    print(
+        json.dumps(
+            result,
+            indent=4
+        )
     )
 
 
@@ -56,10 +113,30 @@ if __name__ == "__main__":
         default="live"
     )
 
-    args = parser.parse_args()
+    args, unknown = parser.parse_known_args()
 
     print(
-        f"\nRUNTIME MODE: {args.mode}\n"
+        f"\nRUNNING MODE: {args.mode}\n"
     )
 
-    execute_runtime()
+    if args.mode == "live":
+
+        run_live()
+
+    elif args.mode == "replay":
+
+        run_replay()
+
+    elif args.mode == "recover":
+
+        run_recover()
+
+    elif args.mode == "verify":
+
+        run_verify()
+
+    else:
+
+        raise ValueError(
+            f"Unsupported mode: {args.mode}"
+        )
