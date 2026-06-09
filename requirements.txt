@@ -1,0 +1,7 @@
+# Canonical Infrastructure Runtime
+#
+# No external dependencies required.
+# Uses Python standard library only.
+#
+# Python Version:
+# 3.10+
