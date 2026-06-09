@@ -1,6 +1,104 @@
-# Live_Canonical_infrastructure_runtime-
-System Overview
+# Live Canonical Infrastructure Runtime
 
-The Live Canonical Infrastructure Runtime is a deterministic execution platform that records runtime events, persists them through append-only storage, reconstructs execution state from historical logs, validates integrity through executable replay, detects runtime corruption, and supports deterministic recovery from interrupted execution paths.
+Deterministic execution platform with a **FastAPI backend** and **React dashboard** for live runtime execution, replay verification, recovery analysis, and observability.
 
-The objective of the system is to guarantee that the same persisted execution history always reconstructs the same runtime truth, enabling reliable replay, verification, auditing, and recovery workflows.
+## Architecture
+
+```
+React Dashboard (port 5173)
+        ↓ REST + WebSocket
+FastAPI Backend (port 8000)
+        ↓
+Runtime Service Layer
+        ↓
+datasets → validation → serialization → hashing → persistence
+  → replay → reconstruction → recovery → observability
+```
+
+## Quick Start (Development)
+
+### 1. Install backend dependencies
+
+```bash
+pip install -r backend/requirements.txt
+```
+
+### 2. Start API server
+
+```bash
+uvicorn backend.api.main:app --reload --host 127.0.0.1 --port 8000
+```
+
+API docs: http://127.0.0.1:8000/docs
+
+### 3. Start frontend (new terminal)
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Dashboard: http://127.0.0.1:5173
+
+### Or use the start script (Windows)
+
+```powershell
+.\start.ps1
+```
+
+## API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/health` | Health check |
+| POST | `/api/runs/live` | Full live pipeline |
+| POST | `/api/runs/replay` | Replay verification |
+| POST | `/api/runs/recover` | Recovery analysis |
+| POST | `/api/runs/verify` | Failure-path tests |
+| GET | `/api/runs` | Run history |
+| GET | `/api/runs/report/latest` | Latest report |
+| GET | `/api/events` | Paginated event log |
+| WS | `/ws` | Live pipeline stage updates |
+
+## CLI (still available)
+
+```bash
+python run_system.py --mode live
+python run_system.py --mode replay
+python run_system.py --mode recover
+python run_system.py --mode verify
+```
+
+## Docker
+
+```bash
+docker compose up --build
+```
+
+- API: http://localhost:8000
+- Dashboard: http://localhost:5173
+
+## Testing
+
+```bash
+python -m unittest tests.test_end_to_end_runtime -v
+```
+
+## Project Structure
+
+```
+run_system.py              # CLI entry point
+services/                  # Runtime service + run store (SQLite)
+backend/api/               # FastAPI REST + WebSocket
+frontend/                  # React + Vite dashboard
+datasets/                  # Dataset generation and loading
+validation/                # Event validation and failure-path testing
+serialization/             # Canonical JSON serialization
+hashing/                   # SHA-256 payload hashing
+persistence/               # Append-only log storage
+replay/                    # Replay and truth reconstruction
+recovery/                  # Interrupted execution recovery
+observability/             # Runtime observer and final report
+tests/                     # End-to-end integration test
+```

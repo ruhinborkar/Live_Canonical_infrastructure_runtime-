@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Canonical Infrastructure Runtime</title>
+  <style>
+    :root { --bg:#0a0e17; --surface:#111827; --border:#2a3548; --text:#e8edf5; --muted:#8b9cb3; --accent:#3b82f6; --success:#22c55e; --warning:#f59e0b; }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { font-family:system-ui,sans-serif; background:var(--bg); color:var(--text); padding:2rem; max-width:1100px; margin:0 auto; }
+    h1 { font-size:1.4rem; margin-bottom:.25rem; }
+    .sub { color:var(--muted); font-size:.85rem; margin-bottom:1.5rem; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:1rem; margin-bottom:1.5rem; }
+    .card { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:1rem; }
+    .card label { font-size:.7rem; text-transform:uppercase; color:var(--muted); }
+    .card .val { font-size:1.1rem; font-weight:600; margin-top:.25rem; font-family:monospace; }
+    .success { color:var(--success); } .warn { color:var(--warning); }
+    .actions { display:flex; gap:.5rem; flex-wrap:wrap; margin-bottom:1.5rem; }
+    button { padding:.65rem 1.1rem; border:none; border-radius:8px; font-weight:600; cursor:pointer; }
+    .primary { background:var(--accent); color:#fff; }
+    .secondary { background:var(--surface); color:var(--text); border:1px solid var(--border); }
+    button:disabled { opacity:.5; cursor:not-allowed; }
+    .panel { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:1rem; margin-bottom:1rem; }
+    .panel h2 { font-size:.95rem; margin-bottom:.75rem; }
+    #log { font-family:monospace; font-size:.75rem; max-height:180px; overflow-y:auto; color:var(--muted); }
+    #log div { padding:.2rem 0; border-bottom:1px solid var(--border); }
+    pre { background:#060a10; border:1px solid var(--border); border-radius:8px; padding:1rem; font-size:.75rem; overflow:auto; max-height:280px; color:var(--muted); }
+    table { width:100%; border-collapse:collapse; font-size:.8rem; }
+    th,td { text-align:left; padding:.5rem; border-bottom:1px solid var(--border); }
+    th { color:var(--muted); font-size:.7rem; }
+    .badge { padding:.1rem .4rem; border-radius:4px; font-size:.7rem; }
+    .badge.ok { background:rgba(34,197,94,.15); color:var(--success); }
+    .badge.bad { background:rgba(239,68,68,.15); color:#ef4444; }
+    .status { display:inline-flex; align-items:center; gap:.4rem; font-size:.8rem; margin-bottom:1rem; }
+    .dot { width:8px; height:8px; border-radius:50%; background:var(--success); }
+    .dot.off { background:#ef4444; }
+  </style>
+</head>
+<body>
+  <h1>Canonical Infrastructure Runtime</h1>
+  <p class="sub">Production dashboard — API integrated</p>
+  <div class="status"><span class="dot" id="dot"></span><span id="apiStatus">Checking API…</span></div>
+
+  <div class="grid">
+    <div class="card"><label>Replay</label><div class="val" id="replay">—</div></div>
+    <div class="card"><label>Truth</label><div class="val" id="truth">—</div></div>
+    <div class="card"><label>Recovery</label><div class="val" id="recovery">—</div></div>
+    <div class="card"><label>Events</label><div class="val" id="events">—</div></div>
+  </div>
+
+  <div class="actions">
+    <button class="primary" id="btnLive" onclick="run('live')">Run Live</button>
+    <button class="secondary" onclick="run('replay')">Replay</button>
+    <button class="secondary" onclick="run('recover')">Recover</button>
+    <button class="secondary" onclick="run('verify')">Verify</button>
+  </div>
+
+  <div class="panel">
+    <h2>Pipeline Log (WebSocket)</h2>
+    <div id="log"><div>Waiting…</div></div>
+  </div>
+
+  <div class="panel">
+    <h2>Recent Events</h2>
+    <table><thead><tr><th>Seq</th><th>Type</th><th>Status</th><th>Trace</th></tr></thead>
+    <tbody id="eventTable"><tr><td colspan="4">No events</td></tr></tbody></table>
+  </div>
+
+  <div class="panel">
+    <h2>Last Output</h2>
+    <pre id="output">—</pre>
+  </div>
+
+  <script>
+    const API = '/api';
+    let ws;
+
+    function connectWs() {
+      const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      ws = new WebSocket(`${proto}//${location.host}/ws`);
+      ws.onmessage = (e) => {
+        const d = JSON.parse(e.data);
+        if (d.type === 'stage') {
+          const log = document.getElementById('log');
+          const div = document.createElement('div');
+          div.textContent = `${d.stage} → ${d.status}`;
+          log.prepend(div);
+        }
+      };
+      ws.onclose = () => setTimeout(connectWs, 2000);
+    }
+
+    async function checkHealth() {
+      try {
+        const r = await fetch(`${API}/health`);
+        const d = await r.json();
+        document.getElementById('apiStatus').textContent = `API ${d.status}`;
+        document.getElementById('dot').classList.remove('off');
+        loadEvents();
+      } catch {
+        document.getElementById('apiStatus').textContent = 'API offline';
+        document.getElementById('dot').classList.add('off');
+      }
+    }
+
+    async function loadEvents() {
+      const r = await fetch(`${API}/events?limit=15`);
+      const d = await r.json();
+      document.getElementById('events').textContent = d.total;
+      const tbody = document.getElementById('eventTable');
+      if (!d.events.length) { tbody.innerHTML = '<tr><td colspan="4">No events</td></tr>'; return; }
+      tbody.innerHTML = d.events.map(e => `<tr>
+        <td>${e.sequence_id}</td><td>${e.event_type}</td>
+        <td><span class="badge ${e.validation_status==='VALID'?'ok':'bad'}">${e.validation_status||'—'}</span></td>
+        <td>${e.trace_id}</td></tr>`).join('');
+    }
+
+    async function run(mode) {
+      document.getElementById('btnLive').disabled = true;
+      document.getElementById('log').innerHTML = '';
+      try {
+        const r = await fetch(`${API}/runs/${mode}`, { method: 'POST' });
+        const d = await r.json();
+        document.getElementById('output').textContent = JSON.stringify(d, null, 2);
+        if (mode === 'live') {
+          document.getElementById('replay').textContent = d.replay_status || '—';
+          document.getElementById('replay').className = 'val ' + (d.replay_status?.includes('VERIFIED') ? 'success' : 'warn');
+          document.getElementById('truth').textContent = d.truth_status || '—';
+          document.getElementById('truth').className = 'val ' + (d.truth_status?.includes('VERIFIED') ? 'success' : 'warn');
+          document.getElementById('recovery').textContent = d.recovery_status || '—';
+        }
+        await loadEvents();
+      } catch (e) {
+        document.getElementById('output').textContent = 'Error: ' + e.message;
+      }
+      document.getElementById('btnLive').disabled = false;
+    }
+
+    checkHealth();
+    connectWs();
+  </script>
+</body>
+</html>
