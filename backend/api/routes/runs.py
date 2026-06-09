@@ -8,7 +8,7 @@ from services.run_store import complete_run, create_run, get_run, list_runs
 from services.runtime_service import RuntimeService
 
 router = APIRouter(prefix="/runs", tags=["runs"])
-_executor = ThreadPoolExecutor(max_workers=2)
+_executor = ThreadPoolExecutor(max_workers=4)
 
 
 def _run_in_thread(fn, *args) -> Any:

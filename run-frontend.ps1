@@ -1,4 +1,4 @@
 $env:PATH = "C:\Program Files\nodejs;" + $env:PATH
 Set-Location "$PSScriptRoot\frontend"
-npm install
-npm run dev
+if (-not (Test-Path "node_modules")) { npm.cmd install }
+npm.cmd run dev

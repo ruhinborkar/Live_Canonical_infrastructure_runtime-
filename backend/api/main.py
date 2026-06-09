@@ -20,9 +20,15 @@ app = FastAPI(
     version="1.0.0",
 )
 
+_dev_origins = [
+    f"http://{host}:{port}"
+    for host in ("localhost", "127.0.0.1")
+    for port in range(5173, 5185)
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=_dev_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

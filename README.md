@@ -41,19 +41,33 @@ npm run dev
 
 Dashboard: http://127.0.0.1:5173
 
-The React app includes:
-- Multi-page navigation (Dashboard, Events, Runs, Verify)
+The React app (v2 production UI) includes:
+- **Login** (demo: `admin` / `runtime` — configure via `VITE_AUTH_*`)
+- Sidebar layout with Dashboard, Events, Runs, Verify, Reports, Settings
+- **Tailwind CSS** design system
+- **TanStack React Query** for API caching and mutations
+- Error boundaries, skeleton loaders, toast notifications
 - Live pipeline monitor with progress bar
 - Charts (validation split, dataset composition)
 - Paginated event explorer with search and filters
 - Run history with detail view and JSON download
-- Toast notifications and loading states
 
-### Or use the start script (Windows)
+```bash
+cd frontend
+npm install
+npm run dev        # development
+npm run build      # production static build → frontend/dist/
+npm test           # vitest unit tests
+```
+
+### One command (Windows — starts both API + frontend)
 
 ```powershell
-.\start.ps1
+cd "c:\Users\Ruhin\OneDrive\Desktop\BlackHole Intelligence"
+powershell -ExecutionPolicy Bypass -File .\start.ps1
 ```
+
+Or double-click `start.bat`
 
 ## API Endpoints
 

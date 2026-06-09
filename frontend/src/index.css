@@ -1,49 +1,59 @@
-:root {
-  --bg: #0a0e17;
-  --surface: #111827;
-  --surface-2: #1a2234;
-  --border: #2a3548;
-  --text: #e8edf5;
-  --muted: #8b9cb3;
-  --accent: #3b82f6;
-  --accent-glow: rgba(59, 130, 246, 0.25);
-  --success: #22c55e;
-  --warning: #f59e0b;
-  --danger: #ef4444;
-  --mono: "IBM Plex Mono", monospace;
-  --sans: "IBM Plex Sans", system-ui, sans-serif;
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-canvas font-sans text-slate-100 antialiased;
+    background-image:
+      radial-gradient(ellipse 80% 50% at 50% -20%, rgba(59, 130, 246, 0.12), transparent),
+      radial-gradient(ellipse 60% 40% at 100% 100%, rgba(34, 197, 94, 0.04), transparent);
+    min-height: 100vh;
+  }
+
+  #root {
+    min-height: 100vh;
+  }
 }
 
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
+@layer components {
+  .panel {
+    @apply rounded-xl border border-line bg-surface p-5 shadow-lg backdrop-blur-sm;
+  }
 
-body {
-  font-family: var(--sans);
-  background: var(--bg);
-  color: var(--text);
-  min-height: 100vh;
-  background-image:
-    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(59, 130, 246, 0.15), transparent),
-    radial-gradient(ellipse 60% 40% at 100% 100%, rgba(34, 197, 94, 0.05), transparent);
-}
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-all hover:bg-blue-500 hover:shadow-glow disabled:cursor-not-allowed disabled:opacity-50;
+  }
 
-#root {
-  min-height: 100vh;
-}
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-line bg-elevated px-4 py-2.5 text-sm font-semibold text-slate-200 transition-all hover:border-blue-500/50 hover:text-blue-400 disabled:cursor-not-allowed disabled:opacity-50;
+  }
 
-button {
-  font-family: var(--sans);
-  cursor: pointer;
-  border: none;
-  border-radius: 8px;
-  font-weight: 600;
-  transition: all 0.15s ease;
-}
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold text-slate-400 transition-all hover:bg-elevated hover:text-slate-200 disabled:cursor-not-allowed disabled:opacity-50;
+  }
 
-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+  .btn-sm {
+    @apply px-3 py-1.5 text-xs;
+  }
+
+  .input {
+    @apply w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-slate-100 placeholder-slate-500 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30;
+  }
+
+  .badge-success {
+    @apply inline-flex items-center rounded bg-emerald-500/15 px-2 py-0.5 text-xs font-semibold text-emerald-400;
+  }
+
+  .badge-warning {
+    @apply inline-flex items-center rounded bg-amber-500/15 px-2 py-0.5 text-xs font-semibold text-amber-400;
+  }
+
+  .badge-danger {
+    @apply inline-flex items-center rounded bg-red-500/15 px-2 py-0.5 text-xs font-semibold text-red-400;
+  }
+
+  .badge-neutral {
+    @apply inline-flex items-center rounded bg-slate-500/15 px-2 py-0.5 text-xs font-semibold text-slate-400;
+  }
 }

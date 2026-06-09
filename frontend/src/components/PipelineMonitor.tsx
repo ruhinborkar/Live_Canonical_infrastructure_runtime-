@@ -1,61 +1,65 @@
 import { PIPELINE_STAGES } from "../api/client";
 import { useRuntime } from "../hooks/useRuntime";
+import { cn } from "../lib/utils";
 
 export default function PipelineMonitor() {
-  const { stageLog, currentStage, completedStages, loading } = useRuntime();
-
-  const currentIndex = currentStage
-    ? PIPELINE_STAGES.indexOf(currentStage as (typeof PIPELINE_STAGES)[number])
-    : -1;
-
-  const doneCount = PIPELINE_STAGES.filter((_, i) => {
-    if (loading && currentIndex >= 0) return i <= currentIndex;
-    return completedStages.has(PIPELINE_STAGES[i]);
-  }).length;
-
-  const progress = Math.round((doneCount / PIPELINE_STAGES.length) * 100);
+  const { stageLog, completedStages, currentIndex, progress, loading } = useRuntime();
 
   function stepClass(stage: string, index: number): string {
     if (loading && currentIndex >= 0) {
-      if (index < currentIndex) return "done";
-      if (index === currentIndex) return "active";
-      return "pending";
+      if (index < currentIndex) return "border-emerald-500/50 bg-emerald-500/10 text-emerald-400";
+      if (index === currentIndex) return "border-blue-500 bg-blue-500/15 text-blue-400 shadow-glow";
+      return "border-line text-slate-600 opacity-50";
     }
-    if (completedStages.has(stage)) return "done";
-    return "pending";
+    if (completedStages.has(stage)) {
+      return "border-emerald-500/50 bg-emerald-500/10 text-emerald-400";
+    }
+    return "border-line text-slate-500";
   }
 
   return (
-    <div className="panel glass">
-      <div className="panel-header">
-        <h2>Pipeline Monitor</h2>
-        <span className="progress-label">
-          {doneCount}/{PIPELINE_STAGES.length} stages
+    <div className="panel">
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="font-semibold">Pipeline Monitor</h2>
+        <span className="font-mono text-xs text-slate-500">
+          {loading ? "Running…" : `${progress}%`}
         </span>
       </div>
 
-      <div className="progress-bar">
-        <div className="progress-fill" style={{ width: `${progress}%` }} />
+      <div className="mb-4 h-1.5 overflow-hidden rounded-full bg-elevated">
+        <div
+          className="h-full rounded-full bg-gradient-to-r from-blue-600 to-emerald-500 transition-all duration-300"
+          style={{ width: `${loading ? progress : progress || (completedStages.size ? 100 : 0)}%` }}
+        />
       </div>
 
-      <div className="pipeline">
+      <div className="flex flex-wrap items-center gap-2">
         {PIPELINE_STAGES.map((stage, i) => (
-          <span key={stage} style={{ display: "contents" }}>
-            {i > 0 && <span className="pipeline-arrow">→</span>}
-            <span className={`pipeline-step ${stepClass(stage, i)}`}>{stage}</span>
+          <span key={stage} className="contents">
+            {i > 0 && <span className="text-slate-600">→</span>}
+            <span
+              className={cn(
+                "rounded-md border px-2 py-1 font-mono text-[10px] font-medium transition-all",
+                stepClass(stage, i)
+              )}
+            >
+              {stage}
+            </span>
           </span>
         ))}
       </div>
 
-      <div className="stage-log">
+      <div className="mt-4 max-h-48 overflow-y-auto font-mono text-xs">
         {stageLog.length === 0 ? (
-          <div className="loading">Waiting for pipeline events…</div>
+          <p className="text-slate-500">
+            {loading ? "Pipeline executing…" : "Click Run Live to start pipeline"}
+          </p>
         ) : (
           [...stageLog].reverse().map((entry, i) => (
-            <div key={`${entry.stage}-${i}`}>
-              <span className="stage-name">{entry.stage}</span>
-              <span className="stage-arrow"> → </span>
-              {entry.status}
+            <div key={`${entry.stage}-${i}`} className="border-b border-line/50 py-1.5">
+              <span className="text-blue-400">{entry.stage}</span>
+              <span className="text-slate-600"> → </span>
+              <span className="text-slate-400">{entry.status}</span>
             </div>
           ))
         )}

@@ -1,28 +1,50 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Layout from "./components/Layout";
-import { RuntimeProvider } from "./hooks/useRuntime";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import ErrorBoundary from "./components/ErrorBoundary";
+import ProtectedRoute from "./components/ProtectedRoute";
+import AppShell from "./components/layout/AppShell";
+import { RuntimeProvider } from "./hooks/RuntimeProvider";
 import { ToastProvider } from "./hooks/useToast";
+import { AuthProvider } from "./providers/AuthProvider";
+import { QueryProvider } from "./providers/QueryProvider";
 import Dashboard from "./pages/Dashboard";
 import EventsPage from "./pages/EventsPage";
+import Login from "./pages/Login";
+import Reports from "./pages/Reports";
 import RunsPage from "./pages/RunsPage";
+import Settings from "./pages/Settings";
 import VerifyPage from "./pages/VerifyPage";
-import "./App.css";
 
 export default function App() {
   return (
-    <ToastProvider>
-      <RuntimeProvider>
-        <BrowserRouter>
-          <Routes>
-            <Route element={<Layout />}>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/events" element={<EventsPage />} />
-              <Route path="/runs" element={<RunsPage />} />
-              <Route path="/verify" element={<VerifyPage />} />
-            </Route>
-          </Routes>
-        </BrowserRouter>
-      </RuntimeProvider>
-    </ToastProvider>
+    <ErrorBoundary>
+      <QueryProvider>
+        <AuthProvider>
+          <ToastProvider>
+            <BrowserRouter>
+              <Routes>
+                <Route path="/login" element={<Login />} />
+                <Route element={<ProtectedRoute />}>
+                  <Route
+                    element={
+                      <RuntimeProvider>
+                        <AppShell />
+                      </RuntimeProvider>
+                    }
+                  >
+                    <Route path="/" element={<Dashboard />} />
+                    <Route path="/events" element={<EventsPage />} />
+                    <Route path="/runs" element={<RunsPage />} />
+                    <Route path="/verify" element={<VerifyPage />} />
+                    <Route path="/reports" element={<Reports />} />
+                    <Route path="/settings" element={<Settings />} />
+                  </Route>
+                </Route>
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </BrowserRouter>
+          </ToastProvider>
+        </AuthProvider>
+      </QueryProvider>
+    </ErrorBoundary>
   );
 }
