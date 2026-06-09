@@ -6,7 +6,7 @@ Write-Host "Starting Canonical Infrastructure Runtime..." -ForegroundColor Cyan
 # Backend
 Start-Process powershell -ArgumentList @(
     "-NoExit", "-Command",
-    "cd '$root'; pip install -r backend/requirements.txt -q; uvicorn backend.api.main:app --reload --host 127.0.0.1 --port 8000"
+    "cd '$root'; pip install -r backend/requirements.txt -q; python -m uvicorn backend.api.main:app --reload --host 127.0.0.1 --port 8002"
 )
 
 Start-Sleep -Seconds 2
@@ -18,6 +18,6 @@ Start-Process powershell -ArgumentList @(
 )
 
 Write-Host ""
-Write-Host "  API:       http://127.0.0.1:8000/docs" -ForegroundColor Green
+Write-Host "  API:       http://127.0.0.1:8002/docs" -ForegroundColor Green
 Write-Host "  Dashboard: http://127.0.0.1:5173" -ForegroundColor Green
 Write-Host ""

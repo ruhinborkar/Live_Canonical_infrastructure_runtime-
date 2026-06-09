@@ -26,12 +26,12 @@ pip install -r backend/requirements.txt
 ### 2. Start API server
 
 ```bash
-uvicorn backend.api.main:app --reload --host 127.0.0.1 --port 8000
+python -m uvicorn backend.api.main:app --reload --host 127.0.0.1 --port 8001
 ```
 
-API docs: http://127.0.0.1:8000/docs
+API docs: http://127.0.0.1:8001/docs
 
-### 3. Start frontend (new terminal)
+### 3. Start React frontend (new terminal — requires Node.js)
 
 ```bash
 cd frontend
@@ -40,6 +40,14 @@ npm run dev
 ```
 
 Dashboard: http://127.0.0.1:5173
+
+The React app includes:
+- Multi-page navigation (Dashboard, Events, Runs, Verify)
+- Live pipeline monitor with progress bar
+- Charts (validation split, dataset composition)
+- Paginated event explorer with search and filters
+- Run history with detail view and JSON download
+- Toast notifications and loading states
 
 ### Or use the start script (Windows)
 
