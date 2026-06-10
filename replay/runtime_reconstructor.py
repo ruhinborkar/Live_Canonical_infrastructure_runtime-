@@ -53,27 +53,15 @@ class RuntimeReconstructor:
         cls
     ):
 
-        live_events = cls._load_jsonl(
-            cls.LIVE_LOG
-        )
+        live_events = cls._load_jsonl(cls.LIVE_LOG)
+        replay_events = cls._load_jsonl(cls.REPLAY_LOG)
+        recovery_events = cls._load_jsonl(cls.RECOVERY_LOG)
 
-        replay_events = cls._load_jsonl(
-            cls.REPLAY_LOG
-        )
-
-        recovery_events = cls._load_jsonl(
-            cls.RECOVERY_LOG
-        )
-
-        all_events = (
-
-            live_events
-            +
-            replay_events
-            +
-            recovery_events
-
-        )
+        validation_events = [
+            event
+            for event in replay_events + recovery_events
+            if event.get("event_type") in ("REPLAY_VALIDATION", "RECOVERY_VALIDATION")
+        ]
 
         trace_lineage = []
 
@@ -87,7 +75,7 @@ class RuntimeReconstructor:
 
         recovery_status = None
 
-        for event in all_events:
+        for event in live_events:
 
             if "trace_id" in event:
 
@@ -107,39 +95,13 @@ class RuntimeReconstructor:
                     event["runtime_state"]
                 )
 
-            if (
-                event.get(
-                    "event_type"
-                )
-                ==
-                "REPLAY_VALIDATION"
-            ):
+        for event in validation_events:
+            if event.get("event_type") == "REPLAY_VALIDATION":
+                runtime_outcome = event.get("status")
 
-                runtime_outcome = (
-                    event.get(
-                        "status"
-                    )
-                )
-
-            if (
-                event.get(
-                    "event_type"
-                )
-                ==
-                "RECOVERY_VALIDATION"
-            ):
-
-                recovery_status = (
-                    event.get(
-                        "recovery_status"
-                    )
-                )
-
-                verification_state = (
-                    event.get(
-                        "integrity_state"
-                    )
-                )
+            if event.get("event_type") == "RECOVERY_VALIDATION":
+                recovery_status = event.get("recovery_status")
+                verification_state = event.get("integrity_state")
 
         duplicate_sequences = []
 
@@ -183,7 +145,7 @@ class RuntimeReconstructor:
         return {
 
             "events_reconstructed":
-                len(all_events),
+                len(live_events),
 
             "execution_state":
                 execution_state,

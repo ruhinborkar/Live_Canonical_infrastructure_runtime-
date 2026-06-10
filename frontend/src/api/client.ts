@@ -49,6 +49,7 @@ export interface StageUpdate {
 }
 
 export interface RuntimeEvent {
+  event_timestamp?: string;
   sequence_id?: number;
   trace_id?: string;
   event_type?: string;
@@ -57,6 +58,44 @@ export interface RuntimeEvent {
   validation_reason?: string;
   payload?: Record<string, unknown>;
   payload_hash?: string;
+  stored_hash?: string;
+  replay_verified?: boolean;
+  replay_source?: string;
+  recovery_status?: string;
+  integrity_state?: string;
+}
+
+export interface EventLogStats {
+  total: number;
+  valid: number;
+  invalid: number;
+  validation_rows: number;
+}
+
+export interface EventsPage {
+  log: string;
+  total: number;
+  filtered_total: number;
+  offset: number;
+  limit: number;
+  stats: EventLogStats;
+  events: RuntimeEvent[];
+}
+
+export interface EventsSummary {
+  logs: Record<
+    string,
+    EventLogStats & { file: string; exists: boolean }
+  >;
+}
+
+export interface EventsQuery {
+  log?: string;
+  limit?: number;
+  offset?: number;
+  status?: "VALID" | "INVALID";
+  search?: string;
+  event_type?: string;
 }
 
 export interface RunRecord {
@@ -107,7 +146,12 @@ export const PIPELINE_STAGES = [
 
 export const api = {
   health: () =>
-    request<{ status: string; service: string }>("/health", { timeoutMs: 10_000 }),
+    request<{
+      status: string;
+      service: string;
+      runtime_version?: string;
+      environment?: string;
+    }>("/health", { timeoutMs: 10_000 }),
 
   listRuns: (limit = 50) =>
     request<{ runs: RunRecord[] }>(`/runs?limit=${limit}`, { timeoutMs: 15_000 }),
@@ -129,13 +173,19 @@ export const api = {
   runVerify: () =>
     request<{ results: VerifyResult[] }>("/runs/verify", { method: "POST", timeoutMs: 60_000 }),
 
-  listEvents: (log = "live", limit = 50, offset = 0) =>
-    request<{
-      total: number;
-      offset: number;
-      limit: number;
-      events: RuntimeEvent[];
-    }>(`/events?log=${log}&limit=${limit}&offset=${offset}`, { timeoutMs: 15_000 }),
+  listEvents: (query: EventsQuery = {}) => {
+    const params = new URLSearchParams();
+    params.set("log", query.log ?? "live");
+    params.set("limit", String(query.limit ?? 50));
+    params.set("offset", String(query.offset ?? 0));
+    if (query.status) params.set("status", query.status);
+    if (query.search?.trim()) params.set("search", query.search.trim());
+    if (query.event_type?.trim()) params.set("event_type", query.event_type.trim());
+    return request<EventsPage>(`/events?${params}`, { timeoutMs: 15_000 });
+  },
+
+  getEventsSummary: () =>
+    request<EventsSummary>("/events/summary", { timeoutMs: 15_000 }),
 };
 
 export function getWebSocketUrl(): string {

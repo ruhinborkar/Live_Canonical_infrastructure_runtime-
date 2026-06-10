@@ -7,7 +7,7 @@ Deterministic execution platform with a **FastAPI backend** and **React dashboar
 ```
 React Dashboard (port 5173)
         ↓ REST + WebSocket
-FastAPI Backend (port 8000)
+FastAPI Backend (port 8002)
         ↓
 Runtime Service Layer
         ↓
@@ -26,10 +26,10 @@ pip install -r backend/requirements.txt
 ### 2. Start API server
 
 ```bash
-python -m uvicorn backend.api.main:app --reload --host 127.0.0.1 --port 8001
+python -m uvicorn backend.api.main:app --reload --host 127.0.0.1 --port 8002
 ```
 
-API docs: http://127.0.0.1:8001/docs
+API docs: http://127.0.0.1:8002/docs
 
 ### 3. Start React frontend (new terminal — requires Node.js)
 

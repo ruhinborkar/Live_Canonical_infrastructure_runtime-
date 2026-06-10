@@ -1,8 +1,10 @@
 import { Link } from "react-router-dom";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRun, useRuns, useRefreshRuns } from "../hooks/queries";
 import { badgeClass, downloadJson, formatDateTime, statusTone } from "../lib/utils";
 import { cn } from "../lib/utils";
+import { nextSortDirection, sortRows, SortDirection } from "../lib/tableSort";
+import SortableTh from "./ui/SortableTh";
 import { TableSkeleton } from "./ui/Skeleton";
 
 interface RunHistoryProps {
@@ -13,9 +15,21 @@ export default function RunHistory({ compact = false }: RunHistoryProps) {
   const { data: runs = [], isLoading, isFetching } = useRuns();
   const refreshRuns = useRefreshRuns();
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [sortKey, setSortKey] = useState<"mode" | "status" | "created_at">("created_at");
+  const [sortDir, setSortDir] = useState<SortDirection>("desc");
   const { data: selected } = useRun(compact ? null : selectedId);
 
-  const displayRuns = compact ? runs.slice(0, 8) : runs;
+  const sortedRuns = useMemo(
+    () => sortRows(runs, sortKey, sortDir),
+    [runs, sortKey, sortDir]
+  );
+  const displayRuns = compact ? sortedRuns.slice(0, 8) : sortedRuns;
+
+  function handleSort(column: string) {
+    const key = column as "mode" | "status" | "created_at";
+    setSortDir((dir) => nextSortDirection(sortKey, key, dir));
+    setSortKey(key);
+  }
   const busy = isLoading || isFetching;
 
   return (
@@ -46,9 +60,9 @@ export default function RunHistory({ compact = false }: RunHistoryProps) {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-line text-left text-xs uppercase text-slate-500">
-                  <th className="pb-2 pr-3">Mode</th>
-                  <th className="pb-2 pr-3">Status</th>
-                  <th className="pb-2">Time</th>
+                  <SortableTh label="Mode" column="mode" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} className="pb-2 pr-3" />
+                  <SortableTh label="Status" column="status" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} className="pb-2 pr-3" />
+                  <SortableTh label="Time" column="created_at" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} className="pb-2" />
                 </tr>
               </thead>
               <tbody>
@@ -82,6 +96,12 @@ export default function RunHistory({ compact = false }: RunHistoryProps) {
           </div>
         )}
       </div>
+
+      {!compact && !selected && displayRuns.length > 0 && (
+        <div className="panel flex items-center justify-center text-sm text-slate-500">
+          Select a run to view details
+        </div>
+      )}
 
       {!compact && selected && (
         <div className="panel">

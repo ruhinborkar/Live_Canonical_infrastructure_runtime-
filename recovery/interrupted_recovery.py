@@ -1,5 +1,8 @@
 
 import json
+from datetime import datetime, timezone
+
+from persistence.append_only_store import AppendOnlyStore
 
 
 class InterruptedRecovery:
@@ -174,7 +177,7 @@ class InterruptedRecovery:
 
         )
 
-        return {
+        result = {
 
             "execution_interrupted":
                 execution_interrupted,
@@ -195,3 +198,56 @@ class InterruptedRecovery:
                 recovery_outcome
 
         }
+
+        cls._persist_analysis(live_events, result)
+
+        return result
+
+    @classmethod
+    def _persist_analysis(cls, live_events, result):
+        AppendOnlyStore.clear_log(cls.RECOVERY_LOG)
+
+        interrupted = [
+            event
+            for event in live_events
+            if event.get("event_type") == "INTERRUPTED_EVENT"
+        ]
+
+        for event in interrupted:
+            AppendOnlyStore.append_event(
+                cls.RECOVERY_LOG,
+                {
+                    "event_timestamp": event.get(
+                        "event_timestamp",
+                        datetime.now(timezone.utc).isoformat(),
+                    ),
+                    "event_type": "RECOVERY_CANDIDATE",
+                    "sequence_id": event.get("sequence_id"),
+                    "trace_id": event.get("trace_id"),
+                    "runtime_state": event.get("runtime_state", "INTERRUPTED"),
+                    "payload": event.get("payload", {}),
+                    "validation_status": "INVALID",
+                    "validation_reason": "interrupted execution",
+                    "recovery_status": "PENDING",
+                },
+            )
+
+        integrity_state = (
+            "COMPROMISED" if result["execution_interrupted"] else "INTACT"
+        )
+
+        AppendOnlyStore.append_event(
+            cls.RECOVERY_LOG,
+            {
+                "event_type": "RECOVERY_VALIDATION",
+                "recovery_status": result["recovery_outcome"],
+                "integrity_state": integrity_state,
+                "missing_sequences": result["missing_sequences"],
+                "duplicate_sequences": result["duplicate_sequences"],
+                "resume_point": result["resume_point"],
+                "validation_status": (
+                    "INVALID" if result["execution_interrupted"] else "VALID"
+                ),
+                "validation_reason": result["recovery_outcome"],
+            },
+        )

@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from backend.api.routes import events, health, runs  # noqa: E402
+from backend.api.routes import events, health, runs, runtime  # noqa: E402
 from backend.api.websocket import register_observer, websocket_endpoint  # noqa: E402
 
 app = FastAPI(
@@ -37,6 +37,7 @@ app.add_middleware(
 app.include_router(health.router, prefix="/api")
 app.include_router(runs.router, prefix="/api")
 app.include_router(events.router, prefix="/api")
+app.include_router(runtime.router, prefix="/api")
 app.add_api_websocket_route("/ws", websocket_endpoint)
 
 STATIC_DIR = ROOT / "backend" / "static"

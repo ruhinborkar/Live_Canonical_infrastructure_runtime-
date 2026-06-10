@@ -4,7 +4,7 @@ import ToastContainer from "../Toast";
 import Sidebar from "./Sidebar";
 
 export default function AppShell() {
-  const { online, refreshAll } = useRuntime();
+  const { online, refreshAll, loadingMode } = useRuntime();
 
   return (
     <div className="flex min-h-screen">
@@ -18,7 +18,12 @@ export default function AppShell() {
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <button className="btn-secondary btn-sm" onClick={() => refreshAll()}>
+            <button
+              type="button"
+              className="btn-secondary btn-sm"
+              onClick={() => void refreshAll()}
+              disabled={loadingMode !== null}
+            >
               Refresh data
             </button>
             <div className="flex items-center gap-2 rounded-full border border-line bg-elevated px-3 py-1.5 font-mono text-xs">

@@ -1,92 +1,238 @@
-import { Fragment, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { RuntimeEvent } from "../api/client";
-import { useEvents, useRefreshAll } from "../hooks/queries";
+import { useEvents, useEventsSummary } from "../hooks/queries";
+import { formatEventRange, LOG_META, LogType } from "../lib/eventLog";
 import { cn } from "../lib/utils";
 import { TableSkeleton } from "./ui/Skeleton";
 
-type Filter = "all" | "VALID" | "INVALID";
-type LogType = "live" | "replay" | "recovery";
+type StatusFilter = "all" | "VALID" | "INVALID";
 
 interface EventsTableProps {
   compact?: boolean;
   pageSize?: number;
 }
 
-export default function EventsTable({ compact = false, pageSize = 20 }: EventsTableProps) {
+function statusBadge(status?: string) {
+  if (!status) return "badge-neutral";
+  if (status === "VALID") return "badge-success";
+  if (status === "INVALID") return "badge-danger";
+  return "badge-neutral";
+}
+
+function useDebouncedValue<T>(value: T, delayMs: number): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebounced(value), delayMs);
+    return () => clearTimeout(timer);
+  }, [value, delayMs]);
+  return debounced;
+}
+
+function EventDetails({ event, logType }: { event: RuntimeEvent; logType: LogType }) {
+  return (
+    <div className="space-y-2 font-sans text-xs">
+      {event.event_timestamp && (
+        <p>
+          <strong>Timestamp:</strong> {event.event_timestamp}
+        </p>
+      )}
+      <p>
+        <strong>Reason:</strong> {event.validation_reason ?? "—"}
+      </p>
+      <p className="break-all">
+        <strong>Hash:</strong> {event.payload_hash ?? "—"}
+      </p>
+      {logType === "replay" && (
+        <>
+          <p>
+            <strong>Replay verified:</strong>{" "}
+            {event.replay_verified === undefined ? "—" : event.replay_verified ? "yes" : "no"}
+          </p>
+          <p className="break-all">
+            <strong>Stored hash:</strong> {event.stored_hash ?? "—"}
+          </p>
+        </>
+      )}
+      {logType === "recovery" && event.recovery_status && (
+        <p>
+          <strong>Recovery status:</strong> {event.recovery_status}
+        </p>
+      )}
+      {event.integrity_state && (
+        <p>
+          <strong>Integrity:</strong> {event.integrity_state}
+        </p>
+      )}
+      {event.payload && Object.keys(event.payload).length > 0 && (
+        <pre className="mt-2 overflow-auto rounded bg-black/30 p-2 font-mono text-slate-400">
+          {JSON.stringify(event.payload, null, 2)}
+        </pre>
+      )}
+    </div>
+  );
+}
+
+export default function EventsTable({ compact = false, pageSize = 25 }: EventsTableProps) {
   const [offset, setOffset] = useState(0);
-  const [filter, setFilter] = useState<Filter>("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [search, setSearch] = useState("");
   const [logType, setLogType] = useState<LogType>("live");
   const [expanded, setExpanded] = useState<number | null>(null);
-  const refreshAll = useRefreshAll();
 
+  const debouncedSearch = useDebouncedValue(search, 300);
   const limit = compact ? 15 : pageSize;
-  const { data, isLoading, isError, refetch } = useEvents(logType, limit, offset);
+  const apiStatus = statusFilter === "all" ? undefined : statusFilter;
+
+  const summary = useEventsSummary();
+  const { data, isLoading, isError, refetch, isFetching } = useEvents(
+    logType,
+    limit,
+    offset,
+    apiStatus,
+    debouncedSearch
+  );
 
   const events = data?.events ?? [];
-  const total = data?.total ?? 0;
-
-  const filtered = events.filter((event: RuntimeEvent) => {
-    if (filter !== "all" && event.validation_status !== filter) return false;
-    if (search) {
-      const q = search.toLowerCase();
-      return (
-        String(event.trace_id ?? "").toLowerCase().includes(q) ||
-        String(event.sequence_id ?? "").includes(q)
-      );
-    }
-    return true;
-  });
-
-  const totalPages = Math.max(1, Math.ceil(total / limit));
+  const stats = data?.stats;
+  const filteredTotal = data?.filtered_total ?? 0;
+  const logTotal = data?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(filteredTotal / limit));
   const currentPage = Math.floor(offset / limit) + 1;
+  const meta = LOG_META[logType];
+  const summaryCounts = summary.data?.logs?.[logType];
+
+  function selectLog(next: LogType) {
+    setLogType(next);
+    setOffset(0);
+    setExpanded(null);
+    setStatusFilter("all");
+    setSearch("");
+  }
+
+  function handleStatusChange(next: StatusFilter) {
+    setStatusFilter(next);
+    setOffset(0);
+    setExpanded(null);
+  }
+
+  const hasFilters = statusFilter !== "all" || debouncedSearch.length > 0;
+  const emptyMessage =
+    logTotal === 0
+      ? meta.emptyHint
+      : hasFilters
+        ? "No events match the current filters"
+        : meta.emptyHint;
 
   return (
     <div className="panel">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="font-semibold">Events {!compact && `(${total})`}</h2>
-        <div className="flex flex-wrap gap-2">
-          {!compact && (
-            <>
-              <select
-                className="input w-auto"
-                value={logType}
-                onChange={(e) => {
-                  setLogType(e.target.value as LogType);
-                  setOffset(0);
-                }}
-              >
-                <option value="live">Live log</option>
-                <option value="replay">Replay log</option>
-                <option value="recovery">Recovery log</option>
-              </select>
-              <input
-                className="input max-w-xs"
-                placeholder="Search trace or seq…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-              <select
-                className="input w-auto"
-                value={filter}
-                onChange={(e) => setFilter(e.target.value as Filter)}
-              >
-                <option value="all">All</option>
-                <option value="VALID">Valid</option>
-                <option value="INVALID">Invalid</option>
-              </select>
-            </>
-          )}
+        <h2 className="font-semibold">Events</h2>
+        <button
+          type="button"
+          className="btn-secondary btn-sm"
+          disabled={isFetching}
+          onClick={() => {
+            void refetch();
+            void summary.refetch();
+          }}
+        >
+          {isFetching ? "Refreshing…" : "Refresh"}
+        </button>
+      </div>
+
+      <div className="mb-4 flex flex-wrap gap-2">
+        {(Object.keys(LOG_META) as LogType[]).map((log) => {
+          const count = summary.data?.logs?.[log]?.total;
+          const active = logType === log;
+          return (
+            <button
+              key={log}
+              type="button"
+              onClick={() => selectLog(log)}
+              className={cn(
+                "rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors",
+                active
+                  ? "border-blue-500/50 bg-blue-600/20 text-blue-300"
+                  : "border-line bg-elevated text-slate-400 hover:text-slate-200"
+              )}
+            >
+              {LOG_META[log].label}
+              {count !== undefined && (
+                <span className="ml-1.5 font-mono text-xs opacity-80">({count})</span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      <p className="mb-3 text-xs text-slate-500">{meta.description}</p>
+
+      {stats && logTotal > 0 && (
+        <div className="mb-4 grid gap-2 sm:grid-cols-4">
+          <div className="rounded-lg border border-line bg-elevated/50 px-3 py-2 text-center">
+            <p className="text-[10px] uppercase text-slate-500">Total</p>
+            <p className="font-mono text-lg font-semibold">{stats.total}</p>
+          </div>
+          <div className="rounded-lg border border-line bg-elevated/50 px-3 py-2 text-center">
+            <p className="text-[10px] uppercase text-slate-500">Valid</p>
+            <p className="font-mono text-lg font-semibold text-emerald-400">{stats.valid}</p>
+          </div>
+          <div className="rounded-lg border border-line bg-elevated/50 px-3 py-2 text-center">
+            <p className="text-[10px] uppercase text-slate-500">Invalid</p>
+            <p className="font-mono text-lg font-semibold text-red-400">{stats.invalid}</p>
+          </div>
+          <div className="rounded-lg border border-line bg-elevated/50 px-3 py-2 text-center">
+            <p className="text-[10px] uppercase text-slate-500">Validation rows</p>
+            <p className="font-mono text-lg font-semibold text-blue-400">
+              {stats.validation_rows}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {!compact && (
+        <div className="mb-4 flex flex-wrap gap-2">
+          <input
+            className="input max-w-xs"
+            placeholder="Search trace, seq, type…"
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setOffset(0);
+              setExpanded(null);
+            }}
+          />
+          <select
+            className="input w-auto"
+            value={statusFilter}
+            onChange={(e) => handleStatusChange(e.target.value as StatusFilter)}
+          >
+            <option value="all">All statuses</option>
+            <option value="VALID">Valid only</option>
+            <option value="INVALID">Invalid only</option>
+          </select>
+        </div>
+      )}
+
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+        <span>
+          {summaryCounts?.exists === false
+            ? "Log file not found on server"
+            : `Showing ${formatEventRange(offset, limit, filteredTotal)}`}
+        </span>
+        {hasFilters && (
           <button
-            className="btn-secondary btn-sm"
+            type="button"
+            className="text-blue-400 hover:text-blue-300"
             onClick={() => {
-              refetch();
-              if (compact) refreshAll();
+              setStatusFilter("all");
+              setSearch("");
+              setOffset(0);
             }}
           >
-            Refresh
+            Clear filters
           </button>
-        </div>
+        )}
       </div>
 
       {isError ? (
@@ -107,15 +253,15 @@ export default function EventsTable({ compact = false, pageSize = 20 }: EventsTa
                 </tr>
               </thead>
               <tbody>
-                {filtered.length === 0 ? (
+                {events.length === 0 ? (
                   <tr>
-                    <td colSpan={compact ? 4 : 5} className="py-6 text-center text-slate-500">
-                      No events — run live mode first
+                    <td colSpan={compact ? 4 : 5} className="py-8 text-center text-slate-500">
+                      {emptyMessage}
                     </td>
                   </tr>
                 ) : (
-                  filtered.map((event, i) => (
-                    <Fragment key={`${event.sequence_id}-${i}`}>
+                  events.map((event, i) => (
+                    <Fragment key={`${event.sequence_id}-${event.event_type}-${offset}-${i}`}>
                       <tr
                         className={cn(
                           "border-b border-line/50 font-mono text-xs",
@@ -123,34 +269,20 @@ export default function EventsTable({ compact = false, pageSize = 20 }: EventsTa
                         )}
                         onClick={() => !compact && setExpanded(expanded === i ? null : i)}
                       >
-                        <td className="py-2 pr-3">{event.sequence_id}</td>
-                        <td className="py-2 pr-3">{event.event_type}</td>
+                        <td className="py-2 pr-3">{event.sequence_id ?? "—"}</td>
+                        <td className="py-2 pr-3">{event.event_type ?? "—"}</td>
                         <td className="py-2 pr-3">
-                          <span
-                            className={
-                              event.validation_status === "VALID"
-                                ? "badge-success"
-                                : "badge-danger"
-                            }
-                          >
+                          <span className={statusBadge(event.validation_status)}>
                             {event.validation_status ?? "—"}
                           </span>
                         </td>
-                        <td className="py-2 pr-3">{event.trace_id}</td>
-                        {!compact && <td className="py-2">{event.runtime_state}</td>}
+                        <td className="py-2 pr-3">{event.trace_id ?? "—"}</td>
+                        {!compact && <td className="py-2">{event.runtime_state ?? "—"}</td>}
                       </tr>
                       {!compact && expanded === i && (
                         <tr className="bg-canvas/50">
-                          <td colSpan={5} className="p-4 font-sans text-xs">
-                            <p>
-                              <strong>Reason:</strong> {event.validation_reason ?? "—"}
-                            </p>
-                            <p className="mt-1 break-all">
-                              <strong>Hash:</strong> {event.payload_hash ?? "—"}
-                            </p>
-                            <pre className="mt-2 overflow-auto rounded bg-black/30 p-2 font-mono text-slate-400">
-                              {JSON.stringify(event.payload, null, 2)}
-                            </pre>
+                          <td colSpan={5} className="p-4">
+                            <EventDetails event={event} logType={logType} />
                           </td>
                         </tr>
                       )}
@@ -161,9 +293,10 @@ export default function EventsTable({ compact = false, pageSize = 20 }: EventsTa
             </table>
           </div>
 
-          {!compact && totalPages > 1 && (
+          {!compact && filteredTotal > limit && (
             <div className="mt-4 flex items-center justify-center gap-4 text-sm text-slate-400">
               <button
+                type="button"
                 className="btn-secondary btn-sm"
                 disabled={offset === 0}
                 onClick={() => setOffset(Math.max(0, offset - limit))}
@@ -174,8 +307,9 @@ export default function EventsTable({ compact = false, pageSize = 20 }: EventsTa
                 Page {currentPage} of {totalPages}
               </span>
               <button
+                type="button"
                 className="btn-secondary btn-sm"
-                disabled={offset + limit >= total}
+                disabled={offset + limit >= filteredTotal}
                 onClick={() => setOffset(offset + limit)}
               >
                 Next

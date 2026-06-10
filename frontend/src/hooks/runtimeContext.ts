@@ -1,11 +1,15 @@
 import { createContext, useContext } from "react";
 import { LiveResult, RunMode, VerifyResult } from "../api/client";
+import { OperationMeta } from "../lib/parseRunResponse";
 import { usePipelineWebSocket } from "./usePipelineWebSocket";
 import { useRuns } from "./queries";
 
 export interface RuntimeContextValue {
   online: boolean;
   loading: boolean;
+  loadingMode: RunMode | null;
+  operationMeta: Record<RunMode, OperationMeta>;
+  hasLiveData: boolean;
   liveResult: LiveResult | null;
   replayStatus: string | null;
   recoveryStatus: string | null;
@@ -17,7 +21,7 @@ export interface RuntimeContextValue {
   progress: number;
   runs: NonNullable<ReturnType<typeof useRuns>["data"]>;
   runsLoading: boolean;
-  run: (mode: RunMode) => void;
+  execute: (mode: RunMode) => Promise<void>;
   refreshAll: () => Promise<void>;
 }
 

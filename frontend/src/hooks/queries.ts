@@ -1,5 +1,5 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, LiveResult, RunMode, VerifyResult } from "../api/client";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { api, LiveResult, VerifyResult } from "../api/client";
 import { bootstrapRuntimeState } from "../lib/bootstrapState";
 import { config } from "../lib/config";
 import { queryKeys } from "./queryKeys";
@@ -32,10 +32,27 @@ export function useRun(runId: string | null) {
   });
 }
 
-export function useEvents(log = "live", limit = 25, offset = 0) {
+export function useEvents(
+  log = "live",
+  limit = 25,
+  offset = 0,
+  status?: "VALID" | "INVALID",
+  search?: string,
+  eventType?: string
+) {
   return useQuery({
-    queryKey: queryKeys.events(log, limit, offset),
-    queryFn: () => api.listEvents(log, limit, offset),
+    queryKey: queryKeys.events(log, limit, offset, status, search, eventType),
+    queryFn: () =>
+      api.listEvents({ log, limit, offset, status, search, event_type: eventType }),
+    staleTime: 0,
+  });
+}
+
+export function useEventsSummary() {
+  return useQuery({
+    queryKey: queryKeys.eventsSummary,
+    queryFn: api.getEventsSummary,
+    staleTime: 0,
   });
 }
 
@@ -84,72 +101,12 @@ export function useLastVerifyResult() {
   });
 }
 
-function pickRecoveryOutcome(data: Record<string, unknown>): string | null {
-  const value = data.recovery_outcome ?? data.recovery_status;
-  return value != null ? String(value) : null;
-}
-
-export function useRuntimeMutations(onStart?: () => void, onComplete?: () => void) {
-  const queryClient = useQueryClient();
-  const { showToast } = useToast();
-
-  const invalidate = () => {
-    queryClient.invalidateQueries({ queryKey: queryKeys.runs });
-    queryClient.invalidateQueries({ queryKey: queryKeys.report });
-    queryClient.invalidateQueries({ queryKey: ["events"] });
-    queryClient.invalidateQueries({ queryKey: queryKeys.health });
-  };
-
-  return useMutation({
-    mutationFn: async (mode: RunMode) => {
-      onStart?.();
-      if (mode === "live") return api.runLive();
-      if (mode === "replay") return api.runReplay();
-      if (mode === "recover") return api.runRecover();
-      return api.runVerify();
-    },
-    onSuccess: (data, mode) => {
-      try {
-        if (mode === "live") {
-          const live = data as LiveResult;
-          queryClient.setQueryData(queryKeys.lastLive, live);
-          const status = live.replay_status ?? "completed";
-          showToast(
-            `Live run — ${status}`,
-            status.includes("VERIFIED") ? "success" : "error"
-          );
-        } else if (mode === "replay") {
-          const status = String(
-            (data as Record<string, unknown>).verification_result ?? "completed"
-          );
-          queryClient.setQueryData(queryKeys.lastReplay, { verification_result: status });
-          showToast(`Replay — ${status}`, status.includes("VERIFIED") ? "success" : "error");
-        } else if (mode === "recover") {
-          const outcome =
-            pickRecoveryOutcome(data as Record<string, unknown>) ?? "completed";
-          queryClient.setQueryData(queryKeys.lastRecover, { recovery_outcome: outcome });
-          showToast(`Recovery — ${outcome}`, "info");
-        } else if (mode === "verify") {
-          const results = (data as { results: VerifyResult[] }).results ?? [];
-          queryClient.setQueryData(queryKeys.lastVerify, results);
-          showToast(`Verify — ${results.length} checks`, "info");
-        }
-        invalidate();
-      } finally {
-        onComplete?.();
-      }
-    },
-    onError: (error: Error) => {
-      showToast(error.message, "error");
-      onComplete?.();
-    },
-  });
-}
-
 export function useRefreshAll() {
   const queryClient = useQueryClient();
   return async () => {
     await bootstrapRuntimeState(queryClient);
+    await queryClient.invalidateQueries({ queryKey: queryKeys.eventsSummary });
+    await queryClient.invalidateQueries({ queryKey: ["console"] });
     await queryClient.invalidateQueries({
       predicate: (query) =>
         !query.queryKey.includes("lastLive") &&

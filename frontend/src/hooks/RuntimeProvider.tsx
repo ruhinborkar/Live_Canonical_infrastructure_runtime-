@@ -2,6 +2,7 @@ import { ReactNode, useCallback, useMemo } from "react";
 import { RunMode } from "../api/client";
 import { useBootstrap } from "./useBootstrap";
 import {
+  useEventsSummary,
   useHealth,
   useLastLiveResult,
   useLastRecoverResult,
@@ -9,17 +10,46 @@ import {
   useLastVerifyResult,
   useRefreshAll,
   useRuns,
-  useRuntimeMutations,
 } from "./queries";
 import { usePipelineWebSocket } from "./usePipelineWebSocket";
+import { useRuntimeActions } from "./useRuntimeActions";
 import { RuntimeContext } from "./runtimeContext";
 
 export function RuntimeProvider({ children }: { children: ReactNode }) {
   useBootstrap();
   const health = useHealth();
   const runs = useRuns();
+  const eventsSummary = useEventsSummary();
   const pipeline = usePipelineWebSocket();
-  const mutation = useRuntimeMutations(pipeline.resetPipeline, pipeline.completePipeline);
+
+  const { execute, loading, loadingMode, operationMeta } = useRuntimeActions({
+    onStart: (mode) => {
+      if (mode === "live") pipeline.resetPipeline();
+      else pipeline.startMode(mode);
+    },
+    onComplete: (mode, data) => {
+      if (mode === "live") {
+        pipeline.completePipeline();
+        return;
+      }
+      const record = data ?? {};
+      if (mode === "replay") {
+        pipeline.completeMode("replay", String(record.verification_result ?? "COMPLETED"));
+      } else if (mode === "recover") {
+        pipeline.completeMode(
+          "recover",
+          String(record.recovery_outcome ?? record.recovery_status ?? "COMPLETED")
+        );
+      } else if (mode === "verify") {
+        pipeline.completeMode("verify", "CHECKS_COMPLETED");
+      }
+    },
+    onError: (mode) => {
+      if (mode === "live") pipeline.completePipeline();
+      else pipeline.completeMode(mode, "FAILED");
+    },
+  });
+
   const lastLive = useLastLiveResult();
   const lastReplay = useLastReplayResult();
   const lastRecover = useLastRecoverResult();
@@ -32,17 +62,23 @@ export function RuntimeProvider({ children }: { children: ReactNode }) {
   const recoveryStatus =
     lastRecover.data?.recovery_outcome ?? liveResult?.recovery_status ?? null;
 
-  const run = useCallback(
-    (mode: RunMode) => {
-      mutation.mutate(mode);
-    },
-    [mutation]
+  const hasLiveData = Boolean(
+    (liveResult?.runtime_execution?.processed_events ?? 0) > 0 ||
+      (eventsSummary.data?.logs?.live?.total ?? 0) > 0 ||
+      (runs.data ?? []).some((run) => run.mode === "live" && run.status === "completed")
   );
+
+  const online = health.data?.status === "ok";
+
+  const stableExecute = useCallback((mode: RunMode) => execute(mode), [execute]);
 
   const value = useMemo(
     () => ({
-      online: health.isSuccess,
-      loading: mutation.isPending,
+      online,
+      loading,
+      loadingMode,
+      operationMeta,
+      hasLiveData,
       liveResult,
       replayStatus,
       recoveryStatus,
@@ -54,12 +90,15 @@ export function RuntimeProvider({ children }: { children: ReactNode }) {
       progress: pipeline.progress,
       runs: runs.data ?? [],
       runsLoading: runs.isLoading,
-      run,
+      execute: stableExecute,
       refreshAll,
     }),
     [
-      health.isSuccess,
-      mutation.isPending,
+      online,
+      loading,
+      loadingMode,
+      operationMeta,
+      hasLiveData,
       liveResult,
       replayStatus,
       recoveryStatus,
@@ -71,7 +110,7 @@ export function RuntimeProvider({ children }: { children: ReactNode }) {
       pipeline.progress,
       runs.data,
       runs.isLoading,
-      run,
+      stableExecute,
       refreshAll,
     ]
   );

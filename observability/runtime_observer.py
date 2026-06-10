@@ -1,5 +1,7 @@
 from typing import Callable
 
+from observability.runtime_metrics import RuntimeMetricsCollector
+
 
 class RuntimeObserver:
     _listeners: list[Callable[[str, str], None]] = []
@@ -20,5 +22,6 @@ class RuntimeObserver:
     @staticmethod
     def observe(stage, status):
         print(f"[OBSERVABILITY] STAGE={stage} | STATUS={status}")
+        RuntimeMetricsCollector.on_stage(stage, status)
         for listener in RuntimeObserver._listeners:
             listener(stage, status)

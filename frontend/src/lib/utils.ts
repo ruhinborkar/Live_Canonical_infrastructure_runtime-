@@ -6,17 +6,17 @@ export function statusTone(value: string): "success" | "warning" | "danger" | "n
   if (
     value.includes("VERIFIED") ||
     value.includes("NOT_REQUIRED") ||
+    value.includes("AVAILABLE") ||
     value === "ok" ||
-    value === "completed"
+    value === "completed" ||
+    value === "OPERATIONAL"
   ) {
     return "success";
   }
-  if (
-    value.includes("REQUIRED") ||
-    value.includes("MISMATCH") ||
-    value.includes("FAILED") ||
-    value.includes("failed")
-  ) {
+  if (value.includes("MISMATCH") || value.includes("FAILED") || value.includes("failed")) {
+    return "danger";
+  }
+  if (value.includes("REQUIRED") || value.includes("MISSING") || value.includes("DEGRADED")) {
     return "warning";
   }
   return "neutral";
