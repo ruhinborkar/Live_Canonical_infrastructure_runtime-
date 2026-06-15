@@ -27,6 +27,16 @@ describe("parseRunResponse", () => {
     expect(results[0].failure_type).toBe("X");
   });
 
+  it("parses verify object payload", () => {
+    const results = pickVerifyResults({
+      failure_path_results: [
+        { failure_type: "X", failure_detected: true, observable_cause: "y" },
+      ],
+      truth_verification: "TRUTH_VERIFIED",
+    });
+    expect(results).toHaveLength(1);
+  });
+
   it("parses live result from API payload", () => {
     const live = parseLiveResult({
       run_id: "abc",

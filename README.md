@@ -83,9 +83,10 @@ Or double-click `start.bat`
 | GET | `/api/events` | Paginated event log |
 | WS | `/ws` | Live pipeline stage updates |
 
-## CLI (still available)
+## CLI (runtime validation)
 
 ```bash
+python run_system.py --mode demo    # full proof: live → replay → truth → recovery
 python run_system.py --mode live
 python run_system.py --mode replay
 python run_system.py --mode recover
@@ -104,13 +105,18 @@ docker compose up --build
 ## Testing
 
 ```bash
-python -m unittest tests.test_end_to_end_runtime -v
+python -m unittest discover -s tests -v
 ```
+
+See `VALIDATION_GUIDE.md` for reviewer validation path.
 
 ## Project Structure
 
 ```
 run_system.py              # CLI entry point
+replay/runtime_truth_reconstructor.py
+validation/truth_verifier.py
+recovery/recovery_proof.py
 services/                  # Runtime service + run store (SQLite)
 backend/api/               # FastAPI REST + WebSocket
 frontend/                  # React + Vite dashboard

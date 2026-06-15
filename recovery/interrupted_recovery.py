@@ -1,211 +1,85 @@
-
-import json
 from datetime import datetime, timezone
+from typing import Any
 
 from persistence.append_only_store import AppendOnlyStore
+from recovery.recovery_proof import RecoveryProofExporter
+from services.event_loader import read_log_events
+
+_RUNTIME_EVENT_TYPES = frozenset(
+    {"NORMAL_EVENT", "CORRUPTED_EVENT", "INTERRUPTED_EVENT"}
+)
 
 
 class InterruptedRecovery:
-
-    LIVE_LOG = (
-        "logging/logs/live_execution.jsonl"
-    )
-
-    REPLAY_LOG = (
-        "logging/logs/replay_log.jsonl"
-    )
-
-    RECOVERY_LOG = (
-        "logging/logs/recovery_log.jsonl"
-    )
-
-    @staticmethod
-    def _load_jsonl(
-        file_path
-    ):
-
-        events = []
-
-        try:
-
-            with open(
-                file_path,
-                "r",
-                encoding="utf-8"
-            ) as file:
-
-                for line in file:
-
-                    line = line.strip()
-
-                    if not line:
-                        continue
-
-                    events.append(
-                        json.loads(line)
-                    )
-
-        except FileNotFoundError:
-
-            pass
-
-        return events
-
     @classmethod
-    def analyze_interruption(
-        cls
-    ):
+    def analyze_interruption(cls) -> dict[str, Any]:
+        live_events = read_log_events(AppendOnlyStore.LIVE_LOG)
 
-        live_events = cls._load_jsonl(
-            cls.LIVE_LOG
-        )
-
-        replay_events = cls._load_jsonl(
-            cls.REPLAY_LOG
-        )
-
-        recovery_events = cls._load_jsonl(
-            cls.RECOVERY_LOG
-        )
-
-        all_events = (
-
-            live_events
-            +
-            replay_events
-            +
-            recovery_events
-
-        )
-
-        sequence_ids = []
-
-        for event in all_events:
-
-            if "sequence_id" in event:
-
-                sequence_ids.append(
-                    event["sequence_id"]
-                )
+        runtime_events = [
+            event
+            for event in live_events
+            if event.get("event_type") in _RUNTIME_EVENT_TYPES
+        ]
 
         sequence_ids = sorted(
-            sequence_ids
+            event["sequence_id"]
+            for event in runtime_events
+            if event.get("sequence_id") is not None
         )
 
-        missing_sequences = []
-
+        missing_sequences: list[int] = []
         if sequence_ids:
+            expected = set(range(sequence_ids[0], sequence_ids[-1] + 1))
+            actual = set(sequence_ids)
+            missing_sequences = sorted(expected - actual)
 
-            start = min(
-                sequence_ids
-            )
+        duplicate_sequences = _duplicate_sequences(sequence_ids)
 
-            end = max(
-                sequence_ids
-            )
+        interrupted_events = [
+            event
+            for event in runtime_events
+            if event.get("event_type") == "INTERRUPTED_EVENT"
+        ]
 
-            expected = set(
-                range(
-                    start,
-                    end + 1
-                )
-            )
-
-            actual = set(
-                sequence_ids
-            )
-
-            missing_sequences = sorted(
-                list(
-                    expected - actual
-                )
-            )
-
-        duplicate_sequences = []
-
-        seen = set()
-
-        for sequence_id in sequence_ids:
-
-            if sequence_id in seen:
-
-                duplicate_sequences.append(
-                    sequence_id
-                )
-
-            seen.add(
-                sequence_id
-            )
-
-        broken_sequence_continuity = (
-
-            len(
-                missing_sequences
-            ) > 0
-
-        )
-
+        broken_sequence_continuity = len(missing_sequences) > 0
         execution_interrupted = (
-
             broken_sequence_continuity
-
-            or
-
-            len(
-                duplicate_sequences
-            ) > 0
-
+            or len(duplicate_sequences) > 0
+            or len(interrupted_events) > 0
         )
 
         resume_point = None
-
         if missing_sequences:
-
-            resume_point = (
-                missing_sequences[0]
-            )
+            resume_point = missing_sequences[0]
+        elif interrupted_events:
+            resume_point = interrupted_events[0].get("sequence_id")
 
         recovery_outcome = (
-
-            "RECOVERY_REQUIRED"
-
-            if execution_interrupted
-
-            else
-
-            "RECOVERY_NOT_REQUIRED"
-
+            "RECOVERY_REQUIRED" if execution_interrupted else "RECOVERY_NOT_REQUIRED"
         )
 
         result = {
-
-            "execution_interrupted":
-                execution_interrupted,
-
-            "broken_sequence_continuity":
-                broken_sequence_continuity,
-
-            "missing_sequences":
-                missing_sequences,
-
-            "duplicate_sequences":
-                duplicate_sequences,
-
-            "resume_point":
-                resume_point,
-
-            "recovery_outcome":
-                recovery_outcome
-
+            "execution_interrupted": execution_interrupted,
+            "broken_sequence_continuity": broken_sequence_continuity,
+            "missing_sequences": missing_sequences,
+            "duplicate_sequences": duplicate_sequences,
+            "interrupted_events": len(interrupted_events),
+            "resume_point": resume_point,
+            "recovery_outcome": recovery_outcome,
         }
 
-        cls._persist_analysis(live_events, result)
+        cls._persist_analysis(runtime_events, result)
+        RecoveryProofExporter.export(result, live_events=runtime_events)
 
         return result
 
     @classmethod
-    def _persist_analysis(cls, live_events, result):
-        AppendOnlyStore.clear_log(cls.RECOVERY_LOG)
+    def _persist_analysis(
+        cls,
+        live_events: list[dict[str, Any]],
+        result: dict[str, Any],
+    ) -> None:
+        AppendOnlyStore.clear_log(AppendOnlyStore.RECOVERY_LOG)
 
         interrupted = [
             event
@@ -215,7 +89,7 @@ class InterruptedRecovery:
 
         for event in interrupted:
             AppendOnlyStore.append_event(
-                cls.RECOVERY_LOG,
+                AppendOnlyStore.RECOVERY_LOG,
                 {
                     "event_timestamp": event.get(
                         "event_timestamp",
@@ -237,13 +111,14 @@ class InterruptedRecovery:
         )
 
         AppendOnlyStore.append_event(
-            cls.RECOVERY_LOG,
+            AppendOnlyStore.RECOVERY_LOG,
             {
                 "event_type": "RECOVERY_VALIDATION",
                 "recovery_status": result["recovery_outcome"],
                 "integrity_state": integrity_state,
                 "missing_sequences": result["missing_sequences"],
                 "duplicate_sequences": result["duplicate_sequences"],
+                "interrupted_events": result["interrupted_events"],
                 "resume_point": result["resume_point"],
                 "validation_status": (
                     "INVALID" if result["execution_interrupted"] else "VALID"
@@ -251,3 +126,13 @@ class InterruptedRecovery:
                 "validation_reason": result["recovery_outcome"],
             },
         )
+
+
+def _duplicate_sequences(sequence_ids: list[int]) -> list[int]:
+    seen: set[int] = set()
+    duplicates: list[int] = []
+    for sequence_id in sequence_ids:
+        if sequence_id in seen:
+            duplicates.append(sequence_id)
+        seen.add(sequence_id)
+    return duplicates

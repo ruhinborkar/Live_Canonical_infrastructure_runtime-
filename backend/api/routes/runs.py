@@ -78,8 +78,18 @@ async def run_verify():
     run_id = create_run("verify")
     try:
         result = await _run_in_thread(RuntimeService.execute_verify)
-        complete_run(run_id, "completed", {"results": result})
-        return {"run_id": run_id, "status": "completed", "results": result}
+        failure_path_results = result.get("failure_path_results", [])
+        stored = {**result, "failure_path_results": failure_path_results}
+        complete_run(run_id, "completed", stored)
+        return {
+            "run_id": run_id,
+            "status": "completed",
+            "truth_verification": result.get("truth_verification"),
+            "truth_checks": result.get("truth_checks"),
+            "failure_path_results": failure_path_results,
+            "results": failure_path_results,
+            "verify": result,
+        }
     except Exception as exc:
         complete_run(run_id, "failed", {"error": str(exc)})
         raise HTTPException(status_code=500, detail=str(exc)) from exc

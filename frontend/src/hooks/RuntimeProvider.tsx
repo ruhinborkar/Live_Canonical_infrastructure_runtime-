@@ -1,5 +1,6 @@
 import { ReactNode, useCallback, useMemo } from "react";
 import { RunMode } from "../api/client";
+import { normalizeVerifyPayload } from "../lib/normalize";
 import { useBootstrap } from "./useBootstrap";
 import {
   useEventsSummary,
@@ -70,6 +71,9 @@ export function RuntimeProvider({ children }: { children: ReactNode }) {
 
   const online = health.data?.status === "ok";
 
+  const lastVerifyPayload = normalizeVerifyPayload(lastVerify.data);
+  const lastVerifyResults = lastVerifyPayload?.failure_path_results ?? [];
+
   const stableExecute = useCallback((mode: RunMode) => execute(mode), [execute]);
 
   const value = useMemo(
@@ -82,7 +86,8 @@ export function RuntimeProvider({ children }: { children: ReactNode }) {
       liveResult,
       replayStatus,
       recoveryStatus,
-      lastVerifyResults: lastVerify.data ?? null,
+      lastVerifyResults,
+      lastVerifyPayload,
       stageLog: pipeline.stageLog,
       currentStage: pipeline.currentStage,
       completedStages: pipeline.completedStages,
@@ -102,7 +107,8 @@ export function RuntimeProvider({ children }: { children: ReactNode }) {
       liveResult,
       replayStatus,
       recoveryStatus,
-      lastVerify.data,
+      lastVerifyPayload,
+      lastVerifyResults,
       pipeline.stageLog,
       pipeline.currentStage,
       pipeline.completedStages,

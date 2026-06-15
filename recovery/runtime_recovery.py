@@ -14,11 +14,38 @@ class RuntimeRecovery:
             if event.get("event_type") == "INTERRUPTED_EVENT"
         ]
 
-        recovery_required = len(interrupted_events) > 0
+        sequence_ids = sorted(
+            event["sequence_id"]
+            for event in events
+            if event.get("sequence_id") is not None
+        )
+
+        missing_sequences: list[int] = []
+        if sequence_ids:
+            expected = set(range(sequence_ids[0], sequence_ids[-1] + 1))
+            actual = set(sequence_ids)
+            missing_sequences = sorted(expected - actual)
+
+        recovery_required = (
+            len(interrupted_events) > 0 or len(missing_sequences) > 0
+        )
+
+        resume_point = None
+        if missing_sequences:
+            resume_point = missing_sequences[0]
+        elif interrupted_events:
+            resume_point = interrupted_events[0].get("sequence_id")
 
         return {
             "recovery_required": recovery_required,
             "interrupted_events": len(interrupted_events),
+            "missing_sequences": missing_sequences,
+            "resume_point": resume_point,
+            "recovery_outcome": (
+                "RECOVERY_REQUIRED"
+                if recovery_required
+                else "RECOVERY_NOT_REQUIRED"
+            ),
             "recovery_status": (
                 "RECOVERY_REQUIRED"
                 if recovery_required
@@ -67,6 +94,8 @@ class RuntimeRecovery:
                 "recovery_status": recovery_result["recovery_status"],
                 "integrity_state": integrity_state,
                 "interrupted_events": recovery_result["interrupted_events"],
+                "missing_sequences": recovery_result.get("missing_sequences", []),
+                "resume_point": recovery_result.get("resume_point"),
                 "validation_status": (
                     "INVALID" if recovery_result["recovery_required"] else "VALID"
                 ),

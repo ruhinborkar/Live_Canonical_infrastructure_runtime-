@@ -1,4 +1,5 @@
 import { LiveResult, RunMode, VerifyResult } from "../api/client";
+import { normalizeVerifyPayload, normalizeVerifyResults } from "./normalize";
 
 export type OperationState = "idle" | "running" | "success" | "error";
 
@@ -23,10 +24,10 @@ export function pickRecoveryOutcome(data: Record<string, unknown>): string {
 }
 
 export function pickVerifyResults(data: Record<string, unknown>): VerifyResult[] {
-  const results = data.results;
-  if (!Array.isArray(results)) return [];
-  return results as VerifyResult[];
+  return normalizeVerifyResults(data);
 }
+
+export { normalizeVerifyPayload };
 
 export function parseLiveResult(data: Record<string, unknown>): LiveResult {
   const runtime = data.runtime_execution as LiveResult["runtime_execution"] | undefined;

@@ -165,15 +165,20 @@ def get_runtime_events(
     status: str | None = None,
     search: str | None = None,
     category: str | None = None,
+    event_type: str | None = None,
+    mode: str | None = None,
 ) -> dict[str, Any]:
     page = load_events(
         log=log,
+        mode=mode,
         limit=limit,
         offset=offset,
         status=status,
         search=search,
         category=category,
+        event_type=event_type,
     )
+    log_key = page.get("log", log)
     events = []
     for event in page.get("events", []):
         hash_status = "—"
@@ -202,7 +207,7 @@ def get_runtime_events(
     return {
         **page,
         "events": events,
-        "summary": load_event_summary().get("logs", {}).get(log, {}),
+        "summary": load_event_summary().get("logs", {}).get(log_key, {}),
     }
 
 

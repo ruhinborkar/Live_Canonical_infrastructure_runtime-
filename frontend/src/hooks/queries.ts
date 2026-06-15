@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, LiveResult, VerifyResult } from "../api/client";
+import { api, LiveResult } from "../api/client";
 import { bootstrapRuntimeState } from "../lib/bootstrapState";
+import { normalizeRuns, VerifyPayload } from "../lib/normalize";
 import { config } from "../lib/config";
 import { queryKeys } from "./queryKeys";
 import { useToast } from "./useToast";
@@ -19,7 +20,7 @@ export function useHealth() {
 export function useRuns() {
   return useQuery({
     queryKey: queryKeys.runs,
-    queryFn: async () => (await api.listRuns()).runs,
+    queryFn: async () => normalizeRuns(await api.listRuns()),
     staleTime: 0,
   });
 }
@@ -93,7 +94,7 @@ export function useLastRecoverResult() {
 }
 
 export function useLastVerifyResult() {
-  return useQuery<VerifyResult[] | null>({
+  return useQuery<VerifyPayload | null>({
     queryKey: queryKeys.lastVerify,
     queryFn: async () => null,
     initialData: null,

@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { formatDateTime } from "../../../lib/utils";
+import { RuntimeReportArtifact } from "../api/types";
 import { runtimeApi } from "../api/runtimeApi";
 import { useRuntimeReports, useReportContent } from "../hooks/useConsoleQueries";
 import EmptyState from "../ui/EmptyState";
 import ErrorState from "../ui/ErrorState";
 import Panel from "../ui/Panel";
 import StatusPill from "../ui/StatusPill";
+import { safeArray } from "../../../lib/normalize";
 import { cn } from "../../../lib/utils";
 import { KpiCardSkeleton } from "../ui/KpiCardSkeleton";
 
@@ -52,12 +54,12 @@ export default function ReportsPanel() {
             <KpiCardSkeleton key={i} />
           ))}
         </div>
-      ) : !data?.reports.length ? (
+      ) : safeArray<RuntimeReportArtifact>(data?.reports).length === 0 ? (
         <EmptyState title="No reports found" message="Run Live to generate runtime artifacts" />
       ) : (
         <>
           <div className="grid gap-3 sm:grid-cols-2" role="list" aria-label="Runtime reports">
-            {data.reports.map((report) => (
+            {safeArray<RuntimeReportArtifact>(data?.reports).map((report) => (
               <article key={report.name} className="report-card" role="listitem">
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex min-w-0 items-center gap-2">

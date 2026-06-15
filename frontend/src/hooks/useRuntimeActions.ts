@@ -9,6 +9,7 @@ import {
   pickReplayStatus,
   pickVerifyResults,
 } from "../lib/parseRunResponse";
+import { normalizeVerifyPayload } from "../lib/normalize";
 import { queryKeys } from "./queryKeys";
 import { useToast } from "./useToast";
 
@@ -69,10 +70,15 @@ export function useRuntimeActions(callbacks: ModeCallbacks = {}) {
         queryClient.setQueryData(queryKeys.lastRecover, { recovery_outcome: outcome });
         showToast(`Recovery — ${outcome}`, "info");
       } else if (mode === "verify") {
+        const payload = normalizeVerifyPayload(data);
+        queryClient.setQueryData(queryKeys.lastVerify, payload);
         const results = pickVerifyResults(data);
-        queryClient.setQueryData(queryKeys.lastVerify, results);
         const detected = results.filter((r) => r.failure_detected).length;
-        showToast(`Verify — ${detected}/${results.length} detected`, "info");
+        const truth = payload?.truth_verification ?? "UNKNOWN";
+        showToast(
+          `Verify — ${truth} · ${detected}/${results.length} failures detected`,
+          truth.includes("VERIFIED") ? "success" : "info"
+        );
       }
 
       setModeState(mode, {

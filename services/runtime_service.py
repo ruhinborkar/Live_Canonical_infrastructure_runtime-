@@ -10,7 +10,9 @@ from observability.runtime_observer import RuntimeObserver
 from persistence.append_only_store import AppendOnlyStore
 from recovery.interrupted_recovery import InterruptedRecovery
 from recovery.runtime_recovery import RuntimeRecovery
-from replay.runtime_reconstructor import RuntimeReconstructor
+from recovery.recovery_proof import RecoveryProofExporter
+from replay.runtime_truth_reconstructor import RuntimeTruthReconstructor
+from validation.truth_verifier import TruthVerifier
 from replay.runtime_replayer import RuntimeReplayer
 from serialization.canonical_serializer import CanonicalSerializer
 from validation.failure_path_executor import FailurePathExecutor
@@ -87,12 +89,18 @@ class RuntimeService:
         )
         cls._observe("REPLAY", replay_result["verification_result"])
 
-        reconstruction_result = RuntimeReconstructor.reconstruct()
-        cls._observe("VERIFICATION", reconstruction_result["truth_verification"])
+        reconstruction = RuntimeTruthReconstructor.reconstruct()
+        truth_verification = TruthVerifier.verify(reconstruction)
+        reconstruction_result = {
+            **reconstruction,
+            "truth_verification": truth_verification,
+        }
+        cls._observe("VERIFICATION", truth_verification)
 
         recovery_start = time.perf_counter()
         recovery_result = RuntimeRecovery.analyze(events)
         RuntimeRecovery.persist_recovery_log(events, recovery_result, clear_log=False)
+        RecoveryProofExporter.export(recovery_result)
         RuntimeMetricsCollector.set_pipeline_timings(
             recovery_ms=round((time.perf_counter() - recovery_start) * 1000, 2)
         )
@@ -113,7 +121,10 @@ class RuntimeService:
             "replay": replay_result,
             "truth_reconstruction": {
                 "events_reconstructed": reconstruction_result["events_reconstructed"],
-                "truth_verification": reconstruction_result["truth_verification"],
+                "truth_verification": truth_verification,
+                "execution_state": reconstruction_result["execution_state"],
+                "sequence_lineage": reconstruction_result["sequence_lineage"],
+                "trace_lineage": reconstruction_result["trace_lineage"],
             },
             "recovery": recovery_result,
         }
@@ -130,7 +141,8 @@ class RuntimeService:
             "report_path": report_path,
             "status": "completed",
             "replay_status": replay_result["verification_result"],
-            "truth_status": reconstruction_result["truth_verification"],
+            "truth_status": truth_verification,
+            "recovery_proof_path": "runtime_recovery_proof.json",
             "recovery_status": recovery_result["recovery_status"],
         }
 
@@ -150,12 +162,53 @@ class RuntimeService:
         return result
 
     @classmethod
-    def execute_verify(cls) -> list[dict[str, Any]]:
+    def execute_verify(cls) -> dict[str, Any]:
         cls._observe("VERIFICATION", "FAILURE_PATH_STARTED")
-        results = FailurePathExecutor.execute()
-        detected = sum(1 for r in results if r.get("failure_detected"))
+        failure_results = FailurePathExecutor.execute()
+        detected = sum(1 for r in failure_results if r.get("failure_detected"))
+
+        reconstruction = RuntimeTruthReconstructor.reconstruct()
+        truth_result = TruthVerifier.verify_with_details(reconstruction)
+
+        cls._observe("VERIFICATION", truth_result["truth_verification"])
         cls._observe("VERIFICATION", f"CHECKS_COMPLETED_{detected}_DETECTED")
-        return results
+
+        return {
+            "truth_verification": truth_result["truth_verification"],
+            "truth_checks": truth_result["checks"],
+            "failure_path_results": failure_results,
+        }
+
+    @classmethod
+    def execute_demo(cls) -> dict[str, Any]:
+        cls._observe("INPUT", "DEMO_STARTED")
+
+        live_result = cls.execute_live()
+
+        cls._observe("REPLAY", "DEMO_REPLAY")
+        replay_result = cls.execute_replay()
+
+        cls._observe("VERIFICATION", "DEMO_RECONSTRUCTION")
+        reconstruction = RuntimeTruthReconstructor.reconstruct()
+        truth_verification = TruthVerifier.verify(reconstruction)
+
+        cls._observe("RECOVERY", "DEMO_RECOVERY")
+        recovery_result = cls.execute_recover()
+
+        verify_result = cls.execute_verify()
+
+        cls._observe("OBSERVABILITY", "DEMO_COMPLETE")
+
+        return {
+            "live": live_result,
+            "replay": replay_result,
+            "reconstruction": reconstruction,
+            "truth_verification": truth_verification,
+            "recovery": recovery_result,
+            "verify": verify_result,
+            "recovery_proof_path": "runtime_recovery_proof.json",
+            "report_path": live_result.get("report_path"),
+        }
 
     @staticmethod
     def load_events(

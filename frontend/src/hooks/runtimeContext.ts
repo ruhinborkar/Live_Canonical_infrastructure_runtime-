@@ -1,5 +1,6 @@
 import { createContext, useContext } from "react";
 import { LiveResult, RunMode, VerifyResult } from "../api/client";
+import { VerifyPayload } from "../lib/normalize";
 import { OperationMeta } from "../lib/parseRunResponse";
 import { usePipelineWebSocket } from "./usePipelineWebSocket";
 import { useRuns } from "./queries";
@@ -13,7 +14,8 @@ export interface RuntimeContextValue {
   liveResult: LiveResult | null;
   replayStatus: string | null;
   recoveryStatus: string | null;
-  lastVerifyResults: VerifyResult[] | null;
+  lastVerifyResults: VerifyResult[];
+  lastVerifyPayload: VerifyPayload | null;
   stageLog: ReturnType<typeof usePipelineWebSocket>["stageLog"];
   currentStage: ReturnType<typeof usePipelineWebSocket>["currentStage"];
   completedStages: ReturnType<typeof usePipelineWebSocket>["completedStages"];

@@ -1,14 +1,21 @@
+import { VerifyResult } from "../api/client";
 import { useRuntime } from "../hooks/useRuntime";
+import { safeArray } from "../lib/normalize";
 import { formatDateTime } from "../lib/utils";
+import StatusPill from "../features/console/ui/StatusPill";
 import OperationBar from "./OperationBar";
 
 export default function VerifyResults() {
-  const { lastVerifyResults, loadingMode, operationMeta, online } = useRuntime();
+  const { lastVerifyResults, lastVerifyPayload, loadingMode, operationMeta, online } =
+    useRuntime();
   const verifying = loadingMode === "verify";
   const meta = operationMeta.verify;
 
-  const detected = lastVerifyResults?.filter((r) => r.failure_detected).length ?? 0;
-  const total = lastVerifyResults?.length ?? 0;
+  const results = safeArray<VerifyResult>(lastVerifyResults);
+  const detected = results.filter((r) => r.failure_detected).length;
+  const total = results.length;
+  const hasPayload = Boolean(lastVerifyPayload);
+  const truthChecks = lastVerifyPayload?.truth_checks ?? {};
 
   return (
     <div className="space-y-6">
@@ -47,13 +54,38 @@ export default function VerifyResults() {
         </div>
       )}
 
-      {!lastVerifyResults && !verifying && !meta.error ? (
+      {!hasPayload && !verifying && !meta.error ? (
         <div className="panel py-10 text-center text-sm text-slate-400">
           Click <strong>Verify</strong> to run failure-path tests
         </div>
       ) : null}
 
-      {lastVerifyResults && lastVerifyResults.length > 0 && (
+      {hasPayload && lastVerifyPayload && (
+        <div className="panel space-y-4">
+          <h2 className="font-semibold">Truth Verification</h2>
+          <div className="flex flex-wrap items-center gap-3">
+            <StatusPill value={lastVerifyPayload.truth_verification} />
+            <span className="text-sm text-slate-400">Reconstruction proof from persisted logs</span>
+          </div>
+          {Object.keys(truthChecks).length > 0 && (
+            <div className="grid gap-2 sm:grid-cols-2">
+              {Object.entries(truthChecks).map(([check, passed]) => (
+                <div
+                  key={check}
+                  className="flex items-center justify-between rounded-lg border border-line/60 bg-elevated/30 px-3 py-2 text-xs"
+                >
+                  <span className="font-mono text-slate-400">{check}</span>
+                  <span className={passed ? "text-emerald-400" : "text-red-400"}>
+                    {passed ? "PASS" : "FAIL"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {total > 0 && (
         <>
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="panel text-center">
@@ -73,7 +105,7 @@ export default function VerifyResults() {
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
-            {lastVerifyResults.map((result) => (
+            {results.map((result) => (
               <div
                 key={result.failure_type}
                 className={`panel border ${

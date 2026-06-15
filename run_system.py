@@ -12,6 +12,7 @@ def execute_live_runtime():
     print("OBSERVABILITY GENERATED")
     print(json.dumps(result, indent=4))
     print(f"\nREPORT PATH: {result['report_path']}")
+    print(f"RECOVERY PROOF: {result.get('recovery_proof_path')}")
 
 
 def run_replay():
@@ -26,6 +27,19 @@ def run_recover():
 
 def run_verify():
     result = RuntimeService.execute_verify()
+    print(result["truth_verification"])
+    print(json.dumps(result, indent=4))
+
+
+def run_demo():
+    result = RuntimeService.execute_demo()
+
+    print("\nDEMO EXECUTION COMPLETE")
+    print(result["live"]["replay_status"])
+    print(result["truth_verification"])
+    print(result["recovery"]["recovery_outcome"])
+    print(f"REPORT PATH: {result['report_path']}")
+    print(f"RECOVERY PROOF: {result['recovery_proof_path']}")
     print(json.dumps(result, indent=4))
 
 
@@ -37,7 +51,7 @@ if __name__ == "__main__":
         "--mode",
         type=str,
         default="live",
-        choices=["live", "replay", "recover", "verify"],
+        choices=["live", "replay", "recover", "verify", "demo"],
     )
     args = parser.parse_args()
     print(f"\nRUNNING MODE: {args.mode}\n")
@@ -50,3 +64,5 @@ if __name__ == "__main__":
         run_recover()
     elif args.mode == "verify":
         run_verify()
+    elif args.mode == "demo":
+        run_demo()

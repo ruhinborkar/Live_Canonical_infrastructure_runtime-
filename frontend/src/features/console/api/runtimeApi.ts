@@ -39,12 +39,16 @@ export const runtimeApi = {
     if (params.status) q.set("status", params.status);
     if (params.search) q.set("search", params.search);
     if (params.category) q.set("category", params.category);
+    const path = `/events?${q}`;
+    if (import.meta.env.DEV) {
+      console.debug("[runtimeApi] GET", path);
+    }
     return request<{
       events: RuntimeEventRow[];
       total: number;
       filtered_total: number;
       stats: Record<string, number>;
-    }>(`/events?${q}`);
+    }>(path);
   },
   metrics: () => request<RuntimeMetrics>("/metrics"),
   logs: (limit = 100) => request<{ logs: RuntimeLogEntry[]; total: number }>(`/logs?limit=${limit}`),

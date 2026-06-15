@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { TableSkeleton } from "../../../components/ui/Skeleton";
 import SortableTh from "../../../components/ui/SortableTh";
 import { LOG_META, LogType } from "../../../lib/eventLog";
@@ -52,14 +52,45 @@ export default function EventExplorer({
   const [sortKey, setSortKey] = useState<SortKey>("sequence_id");
   const [sortDir, setSortDir] = useState<SortDirection>("asc");
 
+  useEffect(() => {
+    if (initialLog) {
+      setLog(initialLog);
+      setOffset(0);
+    }
+  }, [initialLog]);
+
+  useEffect(() => {
+    if (initialCategory) {
+      setCategory(initialCategory);
+      setOffset(0);
+    }
+  }, [initialCategory]);
+
+  const categoryFilter = category === "all" ? undefined : category;
+  const statusFilter = status === "all" ? undefined : status;
+  const searchFilter = search.trim() || undefined;
+
   const { data, isLoading, isError, refetch, isFetching } = useRuntimeEvents(
     log,
     pageSize,
     offset,
-    status === "all" ? undefined : status,
-    search,
-    category === "all" ? undefined : category
+    statusFilter,
+    searchFilter,
+    categoryFilter
   );
+
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      console.debug("[EventExplorer] filters", {
+        log,
+        category: categoryFilter,
+        status: statusFilter,
+        search: searchFilter,
+        offset,
+        filteredTotal: data?.filtered_total,
+      });
+    }
+  }, [log, categoryFilter, statusFilter, searchFilter, offset, data?.filtered_total]);
 
   const events = data?.events ?? [];
   const sortedEvents = useMemo(
@@ -84,7 +115,9 @@ export default function EventExplorer({
           type="button"
           className="btn-secondary btn-sm"
           disabled={isFetching}
-          onClick={() => void refetch()}
+          onClick={() => {
+            void refetch({ cancelRefetch: false });
+          }}
         >
           Refresh
         </button>
@@ -161,7 +194,14 @@ export default function EventExplorer({
         </div>
       ) : events.length === 0 ? (
         <div className="p-5">
-          <EmptyState title="No events" message={LOG_META[log].emptyHint} />
+          <EmptyState
+            title="No events"
+            message={
+              filteredTotal === 0 && (data?.total ?? 0) > 0
+                ? "No events match the current filters. Try All or clear search."
+                : LOG_META[log].emptyHint
+            }
+          />
         </div>
       ) : (
         <>

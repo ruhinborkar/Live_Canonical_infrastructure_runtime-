@@ -47,6 +47,8 @@ export function useRuntimeEvents(
     queryKey: consoleKeys.events(log, limit, offset, status, search, category),
     queryFn: () => runtimeApi.events({ log, limit, offset, status, search, category }),
     staleTime: 0,
+    gcTime: 0,
+    refetchOnMount: "always",
   });
 }
 

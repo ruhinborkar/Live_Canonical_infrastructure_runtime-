@@ -6,6 +6,7 @@ logging/logs/
 datasets/runtime_dataset.jsonl
 observability/final_runtime_report.json
 observability/runtime_metrics.json
+runtime_recovery_proof.json
 data/
 
 frontend/node_modules/

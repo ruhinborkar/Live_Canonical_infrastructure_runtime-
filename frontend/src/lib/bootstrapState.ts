@@ -1,5 +1,6 @@
 import { QueryClient } from "@tanstack/react-query";
-import { api, LiveResult, VerifyResult } from "../api/client";
+import { api, LiveResult } from "../api/client";
+import { normalizeVerifyPayload } from "./normalize";
 import { queryKeys } from "../hooks/queryKeys";
 
 function reportToLiveResult(report: Record<string, unknown>): LiveResult | null {
@@ -45,12 +46,12 @@ export async function bootstrapRuntimeState(queryClient: QueryClient): Promise<v
   try {
     const { runs } = await api.listRuns(50);
 
-    const lastVerify = runs.find((r) => r.mode === "verify" && r.result?.results);
-    if (lastVerify?.result?.results) {
-      queryClient.setQueryData(
-        queryKeys.lastVerify,
-        lastVerify.result.results as VerifyResult[]
-      );
+    const lastVerify = runs.find((r) => r.mode === "verify" && r.result);
+    if (lastVerify?.result) {
+      const payload = normalizeVerifyPayload(lastVerify.result);
+      if (payload) {
+        queryClient.setQueryData(queryKeys.lastVerify, payload);
+      }
     }
 
     const lastReplay = runs.find((r) => r.mode === "replay" && r.result);
