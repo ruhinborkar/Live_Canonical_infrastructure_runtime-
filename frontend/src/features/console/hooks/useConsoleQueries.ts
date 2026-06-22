@@ -14,6 +14,11 @@ export const consoleKeys = {
   ) =>
     ["console", "events", log, limit, offset, status ?? "", search ?? "", category ?? ""] as const,
   metrics: ["console", "metrics"] as const,
+  health: ["console", "health"] as const,
+  startup: ["console", "startup"] as const,
+  ledger: ["console", "ledger"] as const,
+  injection: ["console", "injection"] as const,
+  manifest: ["console", "manifest"] as const,
   logs: (limit: number) => ["console", "logs", limit] as const,
   reports: ["console", "reports"] as const,
   reportContent: (name: string) => ["console", "report-content", name] as const,
@@ -57,6 +62,46 @@ export function useRuntimeMetrics() {
     queryKey: consoleKeys.metrics,
     queryFn: runtimeApi.metrics,
     refetchInterval: 10_000,
+  });
+}
+
+export function useRuntimeHealth() {
+  return useQuery({
+    queryKey: consoleKeys.health,
+    queryFn: runtimeApi.healthMonitor,
+    refetchInterval: 15_000,
+  });
+}
+
+export function useStartupValidation() {
+  return useQuery({
+    queryKey: consoleKeys.startup,
+    queryFn: runtimeApi.startup,
+    refetchInterval: 30_000,
+  });
+}
+
+export function useTruthLedgerStatus() {
+  return useQuery({
+    queryKey: consoleKeys.ledger,
+    queryFn: runtimeApi.ledger,
+    refetchInterval: 15_000,
+  });
+}
+
+export function useFailureInjectionResults() {
+  return useQuery({
+    queryKey: consoleKeys.injection,
+    queryFn: runtimeApi.injection,
+    refetchInterval: 15_000,
+  });
+}
+
+export function useProofManifest() {
+  return useQuery({
+    queryKey: consoleKeys.manifest,
+    queryFn: runtimeApi.manifest,
+    refetchInterval: 15_000,
   });
 }
 

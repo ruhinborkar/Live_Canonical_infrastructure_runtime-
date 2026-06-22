@@ -6,6 +6,9 @@ import RecentRunsTable from "../features/console/components/RecentRunsTable";
 import ReportsPanel from "../features/console/components/ReportsPanel";
 import RuntimeLogConsole from "../features/console/components/RuntimeLogConsole";
 import RuntimeMetricsGrid from "../features/console/components/RuntimeMetricsGrid";
+import TruthVerificationSummary from "../features/console/components/TruthVerificationSummary";
+import OperationalHealthPanel from "../features/console/components/OperationalHealthPanel";
+import OperationalProofPanels from "../features/console/components/OperationalProofPanels";
 import ObservabilityMetrics from "../features/console/components/ObservabilityMetrics";
 import { useRuntime } from "../hooks/useRuntime";
 import { useQueryClient } from "@tanstack/react-query";
@@ -45,6 +48,18 @@ export default function Dashboard() {
 
         <section aria-label="Runtime key performance indicators">
           <RuntimeMetricsGrid />
+        </section>
+
+        <section aria-label="Truth verification summary">
+          <TruthVerificationSummary />
+        </section>
+
+        <section aria-label="Operational health and startup validation">
+          <OperationalHealthPanel />
+        </section>
+
+        <section aria-label="Truth ledger and failure injection proof">
+          <OperationalProofPanels />
         </section>
 
         <section aria-label="Pipeline and observability" className="grid gap-6 xl:grid-cols-5">

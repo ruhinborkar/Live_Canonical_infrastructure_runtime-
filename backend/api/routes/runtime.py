@@ -3,6 +3,9 @@ from typing import Literal
 from fastapi import APIRouter, HTTPException, Query
 
 from services.runtime_console_service import (
+    get_health_monitor,
+    get_injection_results,
+    get_proof_manifest,
     get_report_content,
     get_runtime_events,
     get_runtime_logs,
@@ -10,6 +13,8 @@ from services.runtime_console_service import (
     get_runtime_reports,
     get_runtime_runs,
     get_runtime_status,
+    get_startup_validation,
+    get_truth_ledger_status,
 )
 
 router = APIRouter(prefix="/runtime", tags=["runtime-console"])
@@ -51,6 +56,31 @@ def runtime_events(
 @router.get("/metrics")
 def runtime_metrics():
     return get_runtime_metrics()
+
+
+@router.get("/health")
+def runtime_health():
+    return get_health_monitor()
+
+
+@router.get("/startup")
+def runtime_startup():
+    return get_startup_validation()
+
+
+@router.get("/ledger")
+def runtime_ledger():
+    return get_truth_ledger_status()
+
+
+@router.get("/injection")
+def runtime_injection():
+    return get_injection_results()
+
+
+@router.get("/manifest")
+def runtime_manifest():
+    return get_proof_manifest()
 
 
 @router.get("/logs")

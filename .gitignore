@@ -7,6 +7,11 @@ datasets/runtime_dataset.jsonl
 observability/final_runtime_report.json
 observability/runtime_metrics.json
 runtime_recovery_proof.json
+runtime_recovery_execution_proof.json
+runtime_proof_manifest.json
+truth_ledger_reconstruction_proof.json
+failure_injection_proof.json
+logging/truth_ledger/
 data/
 
 frontend/node_modules/

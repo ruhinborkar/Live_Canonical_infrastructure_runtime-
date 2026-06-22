@@ -82,6 +82,39 @@ export default function VerifyResults() {
               ))}
             </div>
           )}
+          {lastVerifyPayload.validation_state_diff && (
+            <div className="rounded-lg border border-line/60 bg-elevated/20 p-3 text-xs">
+              <p className="font-semibold text-slate-300">Validation state diff</p>
+              <p className="mt-1 font-mono text-slate-400">
+                stored {lastVerifyPayload.validation_state_diff.stored_valid} valid /{" "}
+                {lastVerifyPayload.validation_state_diff.stored_invalid} invalid → recomputed{" "}
+                {lastVerifyPayload.validation_state_diff.recomputed_valid} valid /{" "}
+                {lastVerifyPayload.validation_state_diff.recomputed_invalid} invalid
+              </p>
+              <p className="mt-1 text-slate-500">
+                mismatches: {lastVerifyPayload.validation_state_diff.mismatch_count}
+              </p>
+            </div>
+          )}
+          {lastVerifyPayload.recovery_state_diff && (
+            <div className="rounded-lg border border-line/60 bg-elevated/20 p-3 text-xs">
+              <p className="font-semibold text-slate-300">Recovery state diff</p>
+              <p className="mt-1 font-mono text-slate-400">
+                resume_point={String(lastVerifyPayload.recovery_state_diff.derived?.resume_point ?? "—")}{" "}
+                · interrupted=
+                {String(lastVerifyPayload.recovery_state_diff.derived?.interrupted_events ?? "—")}
+              </p>
+              <p className="mt-1 text-slate-500">
+                independent match:{" "}
+                {lastVerifyPayload.recovery_state_diff.match ? "yes" : "no"}
+              </p>
+            </div>
+          )}
+          {lastVerifyPayload.original_truth_hash && (
+            <p className="break-all font-mono text-[10px] text-slate-500">
+              truth_hash: {lastVerifyPayload.original_truth_hash.slice(0, 16)}…
+            </p>
+          )}
         </div>
       )}
 

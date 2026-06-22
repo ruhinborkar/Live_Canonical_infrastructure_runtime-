@@ -2,6 +2,7 @@ import json
 from datetime import datetime, timezone
 
 from hashing.runtime_hasher import RuntimeHasher
+from ledger.truth_snapshot_store import TruthSnapshotStore
 from persistence.append_only_store import AppendOnlyStore
 from serialization.canonical_serializer import CanonicalSerializer
 
@@ -18,8 +19,16 @@ class RuntimeReplayer:
         events_replayed = 0
         hashes_recomputed = 0
         runtime_states_rebuilt = 0
+        ledger_checks = 0
+        ledger_mismatches = 0
         replay_verified = True
         last_sequence_id = 0
+
+        ledger_by_sequence = {
+            snapshot["sequence_id"]: snapshot
+            for snapshot in TruthSnapshotStore.read_all()
+            if snapshot.get("sequence_id") is not None
+        }
 
         try:
             with open(cls.LOG_FILE, "r", encoding="utf-8") as file:
@@ -55,6 +64,14 @@ class RuntimeReplayer:
                         replay_verified = False
 
                     sequence_id = event.get("sequence_id", 0)
+                    ledger_snapshot = ledger_by_sequence.get(sequence_id)
+                    if ledger_snapshot:
+                        ledger_checks += 1
+                        ledger_hash = ledger_snapshot.get("payload_hash")
+                        if ledger_hash and ledger_hash != payload_hash:
+                            ledger_mismatches += 1
+                            replay_verified = False
+
                     last_sequence_id = sequence_id
 
                     if persist:
@@ -109,5 +126,8 @@ class RuntimeReplayer:
             "events_replayed": events_replayed,
             "hashes_recomputed": hashes_recomputed,
             "runtime_states_rebuilt": runtime_states_rebuilt,
+            "ledger_checks": ledger_checks,
+            "ledger_mismatches": ledger_mismatches,
+            "ledger_verified": ledger_mismatches == 0 and ledger_checks > 0,
             "verification_result": verification_result,
         }

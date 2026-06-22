@@ -1,10 +1,11 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from backend.api.runtime_meta import RUNTIME_VERSION, runtime_environment_label
 from observability.final_runtime_reporter import FinalRuntimeReporter
 from observability.runtime_metrics import RuntimeMetricsCollector
+from observability.startup_validator import StartupValidator
 from services.event_loader import load_event_summary, load_events
 from services.run_store import list_runs
 
@@ -13,7 +14,10 @@ def _parse_ts(value: str | None) -> datetime | None:
     if not value:
         return None
     try:
-        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+        dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt
     except ValueError:
         return None
 
@@ -66,6 +70,35 @@ def _operational_status(replay: str, truth: str, recovery: str, processed: int) 
     return "IDLE"
 
 
+def _latest_verify_run() -> dict[str, Any] | None:
+    for run in list_runs(limit=50):
+        if run.get("mode") != "verify" or run.get("status") != "completed":
+            continue
+        result = run.get("result") or {}
+        if result.get("truth_verification"):
+            return run
+    return None
+
+
+def _should_overlay_verify_truth(
+    *,
+    report_truth: str,
+    report_updated: str | None,
+    verify_completed_at: str | None,
+) -> bool:
+    if not verify_completed_at:
+        return report_truth in ("NOT_RUN", "—", "")
+    verify_dt = _parse_ts(verify_completed_at)
+    report_dt = _parse_ts(report_updated)
+    if report_truth in ("NOT_RUN", "—", ""):
+        return True
+    if verify_dt and report_dt:
+        return verify_dt >= report_dt
+    if verify_dt and not report_dt:
+        return True
+    return False
+
+
 def get_runtime_status() -> dict[str, Any]:
     report, report_updated = _load_report()
     runs = list_runs(limit=1)
@@ -86,6 +119,36 @@ def get_runtime_status() -> dict[str, Any]:
         last_ts = last_run.get("completed_at") or last_run.get("created_at")
 
     last_updated = report_updated or last_ts
+    truth_source = "report"
+    truth_checks: dict[str, Any] | None = None
+    validation_state_diff: dict[str, Any] | None = None
+    recovery_state_diff: dict[str, Any] | None = None
+    original_truth_hash: str | None = None
+    reconstructed_truth_hash: str | None = None
+    last_verify_run_id: str | None = None
+    last_verify_at: str | None = None
+
+    verify_run = _latest_verify_run()
+    if verify_run:
+        verify_result = verify_run.get("result") or {}
+        verify_completed_at = verify_run.get("completed_at") or verify_run.get("created_at")
+        last_verify_run_id = verify_run.get("id")
+        last_verify_at = verify_completed_at
+
+        truth_checks = verify_result.get("truth_checks")
+        validation_state_diff = verify_result.get("validation_state_diff")
+        recovery_state_diff = verify_result.get("recovery_state_diff")
+        original_truth_hash = verify_result.get("original_truth_hash")
+        reconstructed_truth_hash = verify_result.get("reconstructed_truth_hash")
+
+        if _should_overlay_verify_truth(
+            report_truth=truth_status,
+            report_updated=report_updated,
+            verify_completed_at=verify_completed_at,
+        ):
+            truth_status = _pick(verify_result, "truth_verification", default=truth_status)
+            truth_source = "verify_run"
+            last_updated = verify_completed_at or last_updated
 
     return {
         "runtime_status": _operational_status(
@@ -104,6 +167,14 @@ def get_runtime_status() -> dict[str, Any]:
         "replay_verification_status": replay_status,
         "truth_verification_status": truth_status,
         "recovery_status": recovery_status,
+        "truth_source": truth_source,
+        "truth_checks": truth_checks,
+        "validation_state_diff": validation_state_diff,
+        "recovery_state_diff": recovery_state_diff,
+        "original_truth_hash": original_truth_hash,
+        "reconstructed_truth_hash": reconstructed_truth_hash,
+        "last_verify_run_id": last_verify_run_id,
+        "last_verify_at": last_verify_at,
         "last_execution_timestamp": last_ts,
         "last_run_id": last_run.get("id") if last_run else None,
         "api_online": True,
@@ -120,6 +191,15 @@ def get_runtime_runs(limit: int = 20) -> dict[str, Any]:
         truth = result.get("truth_reconstruction") or result
         recover = result.get("recovery") or result
 
+        truth_result = _pick(
+            truth,
+            "truth_verification",
+            "truth_status",
+            default="—",
+        )
+        if run["mode"] == "verify" and truth_result == "—":
+            truth_result = _pick(result, "truth_verification", default="—")
+
         rows.append(
             {
                 "run_id": run["id"],
@@ -135,12 +215,7 @@ def get_runtime_runs(limit: int = 20) -> dict[str, Any]:
                     "replay_status",
                     default="—",
                 ),
-                "truth_result": _pick(
-                    truth,
-                    "truth_verification",
-                    "truth_status",
-                    default="—",
-                ),
+                "truth_result": truth_result,
                 "recovery_result": _pick(
                     recover,
                     "recovery_status",
@@ -219,8 +294,8 @@ def get_runtime_metrics() -> dict[str, Any]:
         processed = (report.get("runtime_execution") or {}).get("processed_events", 0)
 
     total_ms = metrics.get("total_pipeline_ms", 0) or 0
-    throughput = 0.0
-    if total_ms > 0 and processed:
+    throughput = metrics.get("persistence_throughput_eps", 0) or 0.0
+    if not throughput and total_ms > 0 and processed:
         throughput = round(processed / (total_ms / 1000), 2)
 
     return {
@@ -228,13 +303,66 @@ def get_runtime_metrics() -> dict[str, Any]:
         "serialization_time_ms": metrics.get("serialization_time_ms", 0),
         "hash_computation_time_ms": metrics.get("hash_computation_time_ms", 0),
         "persistence_writes": metrics.get("persistence_writes", 0),
+        "execution_duration_ms": metrics.get("execution_duration_ms", 0),
         "replay_duration_ms": metrics.get("replay_duration_ms", 0),
         "recovery_duration_ms": metrics.get("recovery_duration_ms", 0),
+        "reconstruction_duration_ms": metrics.get("reconstruction_duration_ms", 0),
+        "memory_consumption_mb": metrics.get("memory_consumption_mb", 0),
         "total_pipeline_ms": total_ms,
         "processed_events": processed,
+        "events_failed": metrics.get("events_failed", 0),
         "runtime_throughput_eps": throughput,
+        "persistence_throughput_eps": throughput,
         "last_updated": metrics.get("last_updated"),
     }
+
+
+def get_startup_validation() -> dict[str, Any]:
+    return StartupValidator.validate()
+
+
+def get_health_monitor() -> dict[str, Any]:
+    from observability.health_monitor import HealthMonitor
+
+    return HealthMonitor.get_status()
+
+
+def get_truth_ledger_status() -> dict[str, Any]:
+    import json
+
+    path = Path("truth_ledger_reconstruction_proof.json")
+    if not path.exists():
+        return {
+            "available": False,
+            "truth_reconstruction": "NOT_RUN",
+            "source": "TRUTH_LEDGER",
+            "runtime_state": "UNKNOWN",
+        }
+    with open(path, encoding="utf-8") as file:
+        proof = json.load(file)
+    return {"available": True, **proof}
+
+
+def get_injection_results() -> dict[str, Any]:
+    import json
+
+    path = Path("failure_injection_proof.json")
+    if not path.exists():
+        return {"available": False, "results": [], "detected_count": 0}
+    with open(path, encoding="utf-8") as file:
+        proof = json.load(file)
+    return {"available": True, **proof}
+
+
+def get_proof_manifest() -> dict[str, Any]:
+    import json
+
+    path = Path("runtime_proof_manifest.json")
+    if not path.exists():
+        return {"available": False, "overall": "NOT_RUN", "checks": {}}
+    with open(path, encoding="utf-8") as file:
+        manifest = json.load(file)
+    return {"available": True, **manifest}
 
 
 def get_runtime_logs(limit: int = 100) -> dict[str, Any]:

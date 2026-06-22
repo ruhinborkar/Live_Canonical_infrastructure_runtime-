@@ -20,29 +20,35 @@ python run_system.py --mode demo
 
 ## Live Flow
 
-Dataset Generation → Validation → Serialization → Hashing → Persistence → Replay → Truth Reconstruction → Truth Verification → Recovery → Observability
+Dataset Generation → Validation → Serialization → Hashing → Persistence → Truth Ledger → Replay → Truth Reconstruction → Truth Verification → Recovery → Observability
 
 ---
 
-## Dataset
+## Mandatory Deliverables
 
-`datasets/runtime_dataset.jsonl`
-
-- Total Events: 100
-- Normal: 80 | Corrupted: 10 | Interrupted: 10
-- Trace Count: 5
+| Module | Purpose |
+|--------|---------|
+| `ledger/runtime_truth_ledger.py` | Immutable truth ledger + ledger-only reconstruction |
+| `ledger/truth_snapshot_store.py` | Append-only snapshot persistence |
+| `validation/failure_injection_framework.py` | Executable hostile failure injection |
+| `observability/health_monitor.py` | Runtime / replay / persistence / recovery health |
+| `observability/startup_validator.py` | Deploy-time readiness checks |
+| `Dockerfile` + `docker-compose.yml` | Containerized deployment |
+| Dashboard operational panels | Health, startup, ledger, injection visibility |
+| `VALIDATION_GUIDE.md` | <10 minute reviewer path |
 
 ---
 
-## Generated Outputs
+## Proof Artifacts
 
-| Artifact | Purpose |
-|----------|---------|
-| `logging/logs/live_execution.jsonl` | Persisted execution log |
-| `logging/logs/replay_log.jsonl` | Replay verification log |
-| `logging/logs/recovery_log.jsonl` | Recovery analysis log |
-| `observability/final_runtime_report.json` | Observability report |
-| `runtime_recovery_proof.json` | Recovery from persisted truth proof |
+| Artifact | Proof |
+|----------|-------|
+| `truth_ledger_reconstruction_proof.json` | `source: TRUTH_LEDGER`, `truth_reconstruction: SUCCESS` |
+| `failure_injection_proof.json` | Injected failures detected with `system_response` |
+| `GET /api/health/monitor` | Subsystem health exposure |
+| `GET /api/startup/validation` | Startup readiness proof |
+| `runtime_recovery_execution_proof.json` | Executable recovery proof |
+| `runtime_proof_manifest.json` | Aggregated proof checks |
 
 ---
 
@@ -50,9 +56,12 @@ Dataset Generation → Validation → Serialization → Hashing → Persistence 
 
 | Module | Output |
 |--------|--------|
-| `replay/runtime_truth_reconstructor.py` | Rebuilds execution state, sequence lineage, trace lineage from persisted events |
-| `validation/truth_verifier.py` | `TRUTH_VERIFIED` or `TRUTH_MISMATCH` |
-| `recovery/recovery_proof.py` | `runtime_recovery_proof.json` |
+| `ledger/runtime_truth_ledger.py` | Rebuilds runtime truth from ledger snapshots only |
+| `validation/failure_injection_framework.py` | `CORRUPTED_HASH` → `REPLAY_REJECTED` |
+| `replay/runtime_truth_reconstructor.py` | Live-log truth reconstruction |
+| `validation/truth_verifier.py` | `TRUTH_VERIFIED` / `TRUTH_MISMATCH` |
+| `recovery/runtime_recovery_executor.py` | Executable recovery — appends `RECOVERED_EVENT` to live log |
+| `observability/runtime_proof_manifest.py` | `runtime_proof_manifest.json` aggregate |
 
 ---
 
@@ -61,9 +70,12 @@ Dataset Generation → Validation → Serialization → Hashing → Persistence 
 1. Clone repository
 2. `pip install -r backend/requirements.txt`
 3. `python run_system.py --mode demo`
-4. Verify stdout: `REPLAY_VERIFIED`, `TRUTH_VERIFIED`, `RECOVERY_REQUIRED`
-5. Inspect `runtime_recovery_proof.json` and `observability/final_runtime_report.json`
-6. `python -m unittest tests.test_end_to_end_runtime`
+4. `python run_system.py --mode ledger`
+5. `python run_system.py --mode inject`
+6. `python run_system.py --mode manifest`
+7. Verify stdout: `REPLAY_VERIFIED`, `TRUTH_VERIFIED`, `RECOVERY_EXECUTED` or `RECOVERY_REQUIRED`, ledger `SUCCESS`, injection 6/6
+8. Inspect proof JSON files and Dashboard operational panels
+9. `python -m unittest discover -s tests -p "test_*.py"`
 
 ---
 
@@ -72,8 +84,13 @@ Dataset Generation → Validation → Serialization → Hashing → Persistence 
 **STATUS: READY FOR REVIEW**
 
 - Runtime Execution: PASSED
+- Truth Ledger Reconstruction: PASSED
+- Failure Injection Framework: PASSED
 - Replay Verification: PASSED
-- Truth Reconstruction: PASSED
 - Truth Verification: PASSED
 - Recovery Analysis: PASSED
+- Executable Recovery: PASSED
+- Proof Manifest: PASSED
+- Health Monitoring: PASSED
+- Startup Validation: PASSED
 - Observability Generation: PASSED

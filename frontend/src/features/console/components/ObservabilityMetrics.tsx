@@ -13,7 +13,10 @@ export default function ObservabilityMetrics() {
     { label: "Validation Latency", value: data?.validation_latency_ms, unit: "ms" },
     { label: "Replay Duration", value: data?.replay_duration_ms, unit: "ms" },
     { label: "Recovery Duration", value: data?.recovery_duration_ms, unit: "ms" },
-    { label: "Persistence Writes", value: data?.persistence_writes, unit: "" },
+    { label: "Reconstruction Duration", value: data?.reconstruction_duration_ms, unit: "ms" },
+    { label: "Memory Consumption", value: data?.memory_consumption_mb, unit: "MB" },
+    { label: "Events Failed", value: data?.events_failed, unit: "" },
+    { label: "Execution Duration", value: data?.execution_duration_ms, unit: "ms" },
     {
       label: "Runtime Throughput",
       value: data?.runtime_throughput_eps,

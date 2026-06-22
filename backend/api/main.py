@@ -13,6 +13,7 @@ if str(ROOT) not in sys.path:
 
 from backend.api.routes import events, health, runs, runtime  # noqa: E402
 from backend.api.websocket import register_observer, websocket_endpoint  # noqa: E402
+from observability.startup_validator import StartupValidator  # noqa: E402
 
 app = FastAPI(
     title="Canonical Infrastructure Runtime API",
@@ -48,6 +49,7 @@ if STATIC_DIR.exists():
 @app.on_event("startup")
 async def startup() -> None:
     register_observer(asyncio.get_event_loop())
+    StartupValidator.validate()
 
 
 @app.get("/")

@@ -20,9 +20,15 @@ class RuntimeMetricsCollector:
             "serialization_time_ms": 0,
             "hash_computation_time_ms": 0,
             "persistence_writes": 0,
+            "execution_duration_ms": 0,
             "replay_duration_ms": 0,
             "recovery_duration_ms": 0,
             "total_pipeline_ms": 0,
+            "processed_events": 0,
+            "events_failed": 0,
+            "reconstruction_duration_ms": 0,
+            "memory_consumption_mb": 0,
+            "persistence_throughput_eps": 0,
             "last_updated": None,
         }
         cls._logs = []
@@ -81,6 +87,8 @@ class RuntimeMetricsCollector:
         persistence_writes: int | None = None,
         replay_ms: float | None = None,
         recovery_ms: float | None = None,
+        reconstruction_ms: float | None = None,
+        memory_mb: float | None = None,
     ) -> None:
         if validation_ms is not None:
             cls._metrics["validation_latency_ms"] = validation_ms
@@ -94,19 +102,37 @@ class RuntimeMetricsCollector:
             cls._metrics["replay_duration_ms"] = replay_ms
         if recovery_ms is not None:
             cls._metrics["recovery_duration_ms"] = recovery_ms
+        if reconstruction_ms is not None:
+            cls._metrics["reconstruction_duration_ms"] = reconstruction_ms
+        if memory_mb is not None:
+            cls._metrics["memory_consumption_mb"] = memory_mb
         cls._metrics["last_updated"] = datetime.now(timezone.utc).isoformat()
 
     @classmethod
-    def set_counts(cls, processed: int, writes: int | None = None) -> None:
+    def set_counts(
+        cls,
+        processed: int,
+        writes: int | None = None,
+        *,
+        events_failed: int | None = None,
+    ) -> None:
         if writes is not None:
             cls._metrics["persistence_writes"] = writes
         cls._metrics["processed_events"] = processed
+        if events_failed is not None:
+            cls._metrics["events_failed"] = events_failed
         cls._metrics["last_updated"] = datetime.now(timezone.utc).isoformat()
 
     @classmethod
     def finalize(cls, total_ms: float | None = None) -> None:
         if total_ms is not None:
             cls._metrics["total_pipeline_ms"] = round(total_ms, 2)
+            cls._metrics["execution_duration_ms"] = round(total_ms, 2)
+        writes = cls._metrics.get("persistence_writes", 0) or 0
+        if total_ms and writes:
+            cls._metrics["persistence_throughput_eps"] = round(
+                writes / (total_ms / 1000), 2
+            )
         cls._metrics["last_updated"] = datetime.now(timezone.utc).isoformat()
         cls._persist()
 
@@ -136,9 +162,15 @@ class RuntimeMetricsCollector:
             "serialization_time_ms": 0,
             "hash_computation_time_ms": 0,
             "persistence_writes": 0,
+            "execution_duration_ms": 0,
             "replay_duration_ms": 0,
             "recovery_duration_ms": 0,
             "total_pipeline_ms": 0,
+            "processed_events": 0,
+            "events_failed": 0,
+            "reconstruction_duration_ms": 0,
+            "memory_consumption_mb": 0,
+            "persistence_throughput_eps": 0,
             "last_updated": None,
         }
 

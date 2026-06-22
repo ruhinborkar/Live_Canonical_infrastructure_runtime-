@@ -1,13 +1,18 @@
 import { api as base } from "../../../api/client";
 import { config } from "../../../lib/config";
 import {
+  InjectionProof,
+  ProofManifestStatus,
   RuntimeEventRow,
+  RuntimeHealthStatus,
   RuntimeLogEntry,
   RuntimeMetrics,
   RuntimeReportArtifact,
   RuntimeReportContent,
   RuntimeRunRow,
   RuntimeStatus,
+  StartupValidationStatus,
+  TruthLedgerStatus,
 } from "./types";
 
 const BASE = config.apiUrl;
@@ -51,6 +56,11 @@ export const runtimeApi = {
     }>(path);
   },
   metrics: () => request<RuntimeMetrics>("/metrics"),
+  healthMonitor: () => request<RuntimeHealthStatus>("/health"),
+  startup: () => request<StartupValidationStatus>("/startup"),
+  ledger: () => request<TruthLedgerStatus>("/ledger"),
+  injection: () => request<InjectionProof>("/injection"),
+  manifest: () => request<ProofManifestStatus>("/manifest"),
   logs: (limit = 100) => request<{ logs: RuntimeLogEntry[]; total: number }>(`/logs?limit=${limit}`),
   reports: () => request<{ reports: RuntimeReportArtifact[]; total: number }>("/reports"),
   reportContent: (name: string) =>

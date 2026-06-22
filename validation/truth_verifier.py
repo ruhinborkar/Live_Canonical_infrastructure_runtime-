@@ -6,12 +6,11 @@ from typing import Any
 class TruthVerifier:
     @classmethod
     def verify(cls, reconstruction: dict[str, Any]) -> str:
+        if not cls._base_checks_pass(reconstruction):
+            return "TRUTH_MISMATCH"
+
         original = reconstruction["original_runtime_truth"]
         rebuilt = reconstruction["reconstructed_runtime_truth"]
-        replay_status = reconstruction["verification_outcomes"].get("replay_status")
-
-        if replay_status != "REPLAY_VERIFIED":
-            return "TRUTH_MISMATCH"
 
         if original["sequence_lineage"] != rebuilt["sequence_lineage"]:
             return "TRUTH_MISMATCH"
@@ -40,9 +39,15 @@ class TruthVerifier:
         original = reconstruction["original_runtime_truth"]
         rebuilt = reconstruction["reconstructed_runtime_truth"]
         replay_status = reconstruction["verification_outcomes"].get("replay_status")
+        validation_state_diff = reconstruction.get("validation_state_diff", {})
+        recovery_state_diff = reconstruction.get("recovery_state_diff", {})
 
         checks = {
-            "replay_verified": replay_status == "REPLAY_VERIFIED",
+            "replay_verified": reconstruction.get("replay_integrity_verified", False)
+            and replay_status == "REPLAY_VERIFIED",
+            "truth_hash_match": reconstruction.get("truth_hash_match", False),
+            "validation_state_match": validation_state_diff.get("match", False),
+            "recovery_state_match": recovery_state_diff.get("match", False),
             "sequence_lineage_match": (
                 original["sequence_lineage"] == rebuilt["sequence_lineage"]
             ),
@@ -71,4 +76,26 @@ class TruthVerifier:
         return {
             "truth_verification": truth_verification,
             "checks": checks,
+            "original_truth_hash": original.get("truth_hash"),
+            "reconstructed_truth_hash": rebuilt.get("truth_hash"),
+            "validation_state_diff": validation_state_diff,
+            "recovery_state_diff": recovery_state_diff,
         }
+
+    @staticmethod
+    def _base_checks_pass(reconstruction: dict[str, Any]) -> bool:
+        if not reconstruction.get("replay_integrity_verified", False):
+            return False
+
+        if not reconstruction.get("truth_hash_match", False):
+            return False
+
+        validation_state_diff = reconstruction.get("validation_state_diff", {})
+        if not validation_state_diff.get("match", False):
+            return False
+
+        recovery_state_diff = reconstruction.get("recovery_state_diff", {})
+        if not recovery_state_diff.get("match", False):
+            return False
+
+        return True

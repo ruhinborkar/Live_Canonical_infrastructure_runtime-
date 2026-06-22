@@ -1,9 +1,36 @@
 import { RunRecord, RuntimeEvent, VerifyResult } from "../api/client";
 
+export interface ValidationStateDiff {
+  match: boolean;
+  stored_valid: number;
+  stored_invalid: number;
+  recomputed_valid: number;
+  recomputed_invalid: number;
+  mismatch_count: number;
+  mismatched_events: Array<{
+    sequence_id: number;
+    stored_status: string;
+    recomputed_status: string;
+    stored_reason?: string;
+    recomputed_reason?: string;
+  }>;
+}
+
+export interface RecoveryStateDiff {
+  match: boolean;
+  derived: Record<string, unknown>;
+  independent: Record<string, unknown>;
+  field_diffs: Record<string, { derived: unknown; independent: unknown }>;
+}
+
 export interface VerifyPayload {
   truth_verification: string;
   truth_checks: Record<string, boolean>;
   failure_path_results: VerifyResult[];
+  validation_state_diff?: ValidationStateDiff;
+  recovery_state_diff?: RecoveryStateDiff;
+  original_truth_hash?: string;
+  reconstructed_truth_hash?: string;
 }
 
 export function safeArray<T>(value: unknown): T[] {
@@ -54,7 +81,21 @@ export function normalizeVerifyPayload(data: unknown): VerifyPayload | null {
     truth_verification !== "NOT_RUN" ||
     Object.keys(truth_checks).length > 0
   ) {
-    return { truth_verification, truth_checks, failure_path_results };
+    return {
+      truth_verification,
+      truth_checks,
+      failure_path_results,
+      validation_state_diff: (obj.validation_state_diff ??
+        root.validation_state_diff) as ValidationStateDiff | undefined,
+      recovery_state_diff: (obj.recovery_state_diff ??
+        root.recovery_state_diff) as RecoveryStateDiff | undefined,
+      original_truth_hash: String(
+        obj.original_truth_hash ?? root.original_truth_hash ?? ""
+      ) || undefined,
+      reconstructed_truth_hash: String(
+        obj.reconstructed_truth_hash ?? root.reconstructed_truth_hash ?? ""
+      ) || undefined,
+    };
   }
 
   const direct = safeArray<unknown>(root.failure_path_results).filter(isVerifyResultRow);

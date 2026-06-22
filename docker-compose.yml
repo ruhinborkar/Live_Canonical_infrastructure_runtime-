@@ -5,12 +5,26 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8000:8000"
+    environment:
+      RUNTIME_ENV: production
     volumes:
       - ./logging:/app/logging
       - ./datasets:/app/datasets
       - ./observability:/app/observability
       - ./data:/app/data
     working_dir: /app
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health/monitor')",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
 
   frontend:
     build:
@@ -19,4 +33,5 @@ services:
     ports:
       - "5173:80"
     depends_on:
-      - api
+      api:
+        condition: service_healthy

@@ -25,7 +25,7 @@ class RecoveryProofExporter:
             for event in events
             if event.get("sequence_id") is not None
             and event.get("event_type")
-            in ("NORMAL_EVENT", "CORRUPTED_EVENT", "INTERRUPTED_EVENT")
+            in ("NORMAL_EVENT", "CORRUPTED_EVENT", "INTERRUPTED_EVENT", "RECOVERED_EVENT")
         )
 
         interrupted_events = [
@@ -56,6 +56,9 @@ class RecoveryProofExporter:
             ),
             "resumed_from_persisted_truth": True,
             "assumptions_used": False,
+            "recovery_executed": bool(recovery_result.get("recovery_executed")),
+            "events_recovered": recovery_result.get("events_recovered", 0),
+            "executable_recovery": bool(recovery_result.get("recovery_executed")),
             "source_log": AppendOnlyStore.LIVE_LOG,
         }
 
