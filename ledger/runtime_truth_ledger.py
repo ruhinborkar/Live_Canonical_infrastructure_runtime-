@@ -67,22 +67,54 @@ class RuntimeTruthLedger:
                 "reason": "ledger empty",
             }
 
-        sequence_lineage = [
+        raw_lineage = [
             snapshot["sequence_id"]
             for snapshot in snapshots
             if snapshot.get("sequence_id") is not None
         ]
+
+        # The ledger is append-only, but runtime truth is the latest snapshot per
+        # sequence_id: a RECOVERED_EVENT supersedes the INTERRUPTED snapshot it
+        # replaces. Collapse to the latest snapshot per sequence to reconstruct
+        # current truth, while still detecting illegitimate (non-recovery) duplicates.
+        latest_by_sequence: dict[Any, dict[str, Any]] = {}
+        seen_sequences: set[Any] = set()
+        divergent_duplicate = False
+        for snapshot in snapshots:
+            sequence_id = snapshot.get("sequence_id")
+            if sequence_id is None:
+                continue
+            if sequence_id in seen_sequences:
+                is_recovery = (
+                    snapshot.get("event_type") == "RECOVERED_EVENT"
+                    or snapshot.get("recovery_state") == "RECOVERED"
+                )
+                if not is_recovery:
+                    divergent_duplicate = True
+            seen_sequences.add(sequence_id)
+            latest_by_sequence[sequence_id] = snapshot
+
+        final_snapshots = [
+            latest_by_sequence[sequence_id]
+            for sequence_id in sorted(latest_by_sequence)
+        ]
+        sequence_lineage = [snap["sequence_id"] for snap in final_snapshots]
         trace_lineage = [
-            snapshot["trace_id"]
-            for snapshot in snapshots
-            if snapshot.get("trace_id")
+            snap["trace_id"] for snap in final_snapshots if snap.get("trace_id")
         ]
-        execution_state = snapshots[-1].get("execution_state")
         payload_hashes = [
-            snapshot.get("payload_hash")
-            for snapshot in snapshots
-            if snapshot.get("payload_hash")
+            snap.get("payload_hash") for snap in final_snapshots if snap.get("payload_hash")
         ]
+
+        recovered_count = sum(
+            1 for snap in final_snapshots if snap.get("recovery_state") == "RECOVERED"
+        )
+        unresolved_interrupted = sum(
+            1 for snap in final_snapshots if snap.get("recovery_state") == "INTERRUPTED"
+        )
+        execution_state = (
+            "OPERATIONAL" if unresolved_interrupted == 0 else "INTERRUPTED"
+        )
 
         snapshot_truth = {
             "execution_state": execution_state,
@@ -94,40 +126,44 @@ class RuntimeTruthLedger:
             CanonicalSerializer.serialize(snapshot_truth)
         )
 
-        sequence_ordered = (
-            not sequence_lineage or sequence_lineage == sorted(sequence_lineage)
-        )
+        sequence_ordered = sequence_lineage == sorted(sequence_lineage)
         sequence_unique = len(sequence_lineage) == len(set(sequence_lineage))
 
-        success = sequence_ordered and sequence_unique and len(snapshots) > 0
+        success = (
+            sequence_ordered
+            and sequence_unique
+            and not divergent_duplicate
+            and len(final_snapshots) > 0
+        )
         runtime_state = execution_state or "OPERATIONAL"
 
         return {
             "truth_reconstruction": "SUCCESS" if success else "FAILED",
             "source": "TRUTH_LEDGER",
             "runtime_state": runtime_state,
-            "snapshots_reconstructed": len(snapshots),
+            "snapshots_reconstructed": len(final_snapshots),
+            "snapshots_appended": len(snapshots),
+            "events_recovered": recovered_count,
             "sequence_lineage": sequence_lineage,
             "trace_lineage": trace_lineage,
             "execution_state": execution_state,
             "truth_hash": truth_hash,
             "validation_summary": {
                 "valid": sum(
-                    1 for s in snapshots if s.get("validation_state") == "VALID"
+                    1 for s in final_snapshots if s.get("validation_state") == "VALID"
                 ),
                 "invalid": sum(
-                    1 for s in snapshots if s.get("validation_state") == "INVALID"
+                    1 for s in final_snapshots if s.get("validation_state") == "INVALID"
                 ),
             },
             "recovery_summary": {
                 "intact": sum(
-                    1 for s in snapshots if s.get("recovery_state") == "INTACT"
+                    1 for s in final_snapshots if s.get("recovery_state") == "INTACT"
                 ),
-                "interrupted": sum(
-                    1 for s in snapshots if s.get("recovery_state") == "INTERRUPTED"
-                ),
+                "recovered": recovered_count,
+                "interrupted": unresolved_interrupted,
                 "compromised": sum(
-                    1 for s in snapshots if s.get("recovery_state") == "COMPROMISED"
+                    1 for s in final_snapshots if s.get("recovery_state") == "COMPROMISED"
                 ),
             },
         }

@@ -40,6 +40,7 @@ Dashboard: http://127.0.0.1:5173/ (login: `admin` / `runtime`)
 
 ```bash
 python run_system.py --mode live
+python run_system.py --mode recover
 python run_system.py --mode ledger
 ```
 
@@ -50,17 +51,22 @@ SUCCESS
 TRUTH_LEDGER
 ```
 
-Expected proof file `truth_ledger_reconstruction_proof.json`:
+Expected proof file `truth_ledger_reconstruction_proof.json` after recovery:
 
 ```json
 {
   "truth_reconstruction": "SUCCESS",
   "source": "TRUTH_LEDGER",
-  "runtime_state": "OPERATIONAL"
+  "runtime_state": "OPERATIONAL",
+  "events_recovered": 10
 }
 ```
 
-Note: `runtime_state` reflects the final execution state in the dataset (may be `INTERRUPTED` when interrupted events are last).
+Reconstruction reads `logging/truth_ledger/truth_snapshots.jsonl` only — no replay logs.
+
+Note on `runtime_state`:
+- Directly after `--mode live` (before recovery), the dataset ends on interrupted events, so `runtime_state` is `INTERRUPTED` (still `truth_reconstruction: SUCCESS`).
+- After `--mode recover`, recovered snapshots supersede the interrupted ones (latest snapshot per `sequence_id` wins), so `runtime_state` becomes `OPERATIONAL`.
 
 API: `GET /api/runtime/ledger`
 
