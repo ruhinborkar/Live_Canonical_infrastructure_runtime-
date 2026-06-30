@@ -11,7 +11,7 @@ from typing import Any
 from capabilities.execution_audit_chain import ExecutionAuditChain
 from hardening.dependency_monitor import DependencyMonitor
 from hardening.graceful_degradation import GracefulDegradation
-from intelligence.runtime_anomaly_detection import RuntimeAnomalyDetection
+from hardening.low_anomaly_rate_check import evaluate_low_anomaly_rate
 from observability.health_monitor import HealthMonitor
 from observability.startup_validator import StartupValidator
 from runtime.operational_state_manager import OperationalStateManager
@@ -23,10 +23,23 @@ class ReadinessScore:
     def compute(cls) -> dict[str, Any]:
         contributors: list[dict[str, Any]] = []
 
-        def add(name: str, passed: bool, weight: float, detail: str = "") -> None:
-            contributors.append(
-                {"signal": name, "passed": bool(passed), "weight": weight, "detail": detail}
-            )
+        def add(
+            name: str,
+            passed: bool,
+            weight: float,
+            detail: str = "",
+            *,
+            extra: dict[str, Any] | None = None,
+        ) -> None:
+            row: dict[str, Any] = {
+                "signal": name,
+                "passed": bool(passed),
+                "weight": weight,
+                "detail": detail,
+            }
+            if extra:
+                row.update(extra)
+            contributors.append(row)
 
         startup = StartupValidator.validate()
         add("startup_validation", startup.get("ready", False), 1.5, startup.get("status", ""))
@@ -51,12 +64,38 @@ class ReadinessScore:
         mode = GracefulDegradation.mode()
         add("degradation_mode", mode != "CRITICAL", 0.5, f"mode={mode}")
 
-        anomalies = RuntimeAnomalyDetection.scan()
-        add("low_anomaly_rate", anomalies.get("anomaly_rate", 0.0) <= 0.3, 0.5,
-            f"rate={anomalies.get('anomaly_rate')}")
+        anomaly_check = evaluate_low_anomaly_rate()
+        add(
+            "low_anomaly_rate",
+            anomaly_check["counts_for_score"],
+            0.5,
+            anomaly_check["message"],
+            extra={
+                "check": anomaly_check["check"],
+                "status": anomaly_check["status"],
+                "reason": anomaly_check["reason"],
+                "intentional_anomalies": anomaly_check["intentional_anomalies"],
+                "unexpected_anomalies": anomaly_check["unexpected_anomalies"],
+                "production_impact": anomaly_check["production_impact"],
+                "message": anomaly_check["message"],
+                "failure_injection_active": anomaly_check["failure_injection_active"],
+                "anomaly_rate": anomaly_check["anomaly_rate"],
+                "threshold": anomaly_check["threshold"],
+                "display_status": (
+                    "TEST_FAIL"
+                    if anomaly_check["status"] == "FAIL"
+                    and not anomaly_check["production_impact"]
+                    else anomaly_check["status"]
+                ),
+            },
+        )
 
         total_weight = sum(c["weight"] for c in contributors)
-        earned = sum(c["weight"] for c in contributors if c["passed"])
+        earned = sum(
+            c["weight"]
+            for c in contributors
+            if c.get("counts_for_score", c["passed"])
+        )
         score10 = round(10 * earned / total_weight, 1) if total_weight else 0.0
 
         if score10 >= 9:

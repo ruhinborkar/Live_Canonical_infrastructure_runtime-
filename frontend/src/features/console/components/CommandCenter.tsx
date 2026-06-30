@@ -85,15 +85,52 @@ function Readiness() {
             <span className="text-slate-500">/ {data.max}</span>
             <StatusPill value={data.grade} />
           </div>
-          <div className="space-y-1">
-            {data.contributors.map((c) => (
-              <div key={c.signal} className="flex items-center justify-between text-xs">
-                <span className="font-mono text-slate-400">{c.signal}</span>
-                <span className={c.passed ? "text-emerald-400" : "text-red-400"}>
-                  {c.passed ? "PASS" : "FAIL"}
-                </span>
-              </div>
-            ))}
+          <div className="space-y-2">
+            {data.contributors.map((c) => {
+              const isAnomalyCheck = c.signal === "low_anomaly_rate";
+              const displayStatus =
+                c.display_status ?? (c.passed ? "PASS" : "FAIL");
+              const statusClass =
+                displayStatus === "PASS"
+                  ? "text-emerald-400"
+                  : displayStatus === "TEST_FAIL"
+                    ? "text-amber-400"
+                    : "text-red-400";
+
+              return (
+                <div key={c.signal} className="rounded border border-white/[0.06] px-2 py-1.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-mono text-slate-400">
+                      {isAnomalyCheck ? "Low Anomaly Rate" : c.signal}
+                    </span>
+                    <span className={statusClass}>{displayStatus}</span>
+                  </div>
+                  {isAnomalyCheck && c.reason && (
+                    <div className="mt-1.5 space-y-0.5 text-[11px] text-slate-500">
+                      <p>
+                        <span className="text-slate-400">Reason:</span> {c.reason}
+                      </p>
+                      {c.intentional_anomalies != null && c.intentional_anomalies > 0 && (
+                        <p>{c.intentional_anomalies} intentional anomal{c.intentional_anomalies === 1 ? "y" : "ies"} detected</p>
+                      )}
+                      {c.unexpected_anomalies != null && c.unexpected_anomalies === 0 && c.failure_injection_active && (
+                        <p className="text-slate-400">No unexpected production anomalies</p>
+                      )}
+                      {c.unexpected_anomalies != null && c.unexpected_anomalies > 0 && (
+                        <p className="text-red-400/80">
+                          {c.unexpected_anomalies} unexpected production anomal
+                          {c.unexpected_anomalies === 1 ? "y" : "ies"} detected
+                        </p>
+                      )}
+                      {c.message && <p className="text-slate-600">{c.message}</p>}
+                    </div>
+                  )}
+                  {!isAnomalyCheck && c.detail && (
+                    <p className="mt-1 text-[11px] text-slate-600">{c.detail}</p>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       ) : (

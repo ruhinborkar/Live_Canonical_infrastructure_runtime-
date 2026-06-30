@@ -54,11 +54,29 @@ export interface SituationView {
   what_happens_next: { recommendations: Array<{ priority: string; action: string; rationale: string }> };
 }
 
+export interface ReadinessContributor {
+  signal: string;
+  passed: boolean;
+  weight: number;
+  detail: string;
+  check?: string;
+  status?: string;
+  display_status?: string;
+  reason?: string;
+  intentional_anomalies?: number;
+  unexpected_anomalies?: number;
+  production_impact?: boolean;
+  message?: string;
+  failure_injection_active?: boolean;
+  anomaly_rate?: number;
+  threshold?: number;
+}
+
 export interface ReadinessView {
   score: number;
   max: number;
   grade: string;
-  contributors: Array<{ signal: string; passed: boolean; weight: number; detail: string }>;
+  contributors: ReadinessContributor[];
 }
 
 export interface QueueView {
