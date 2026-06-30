@@ -52,6 +52,79 @@ def run_manifest():
     print(json.dumps(result, indent=4))
 
 
+def run_operate(duration: float = 0.0):
+    """Boot the operational runtime backbone and keep it alive.
+
+    Continuously feeds synthetic work and runs until interrupted (Ctrl+C) or,
+    when --duration is given, for that many seconds. Proves the runtime stays
+    alive and processes work continuously.
+    """
+    import time
+
+    from services.operational_runtime_service import OperationalRuntimeService
+
+    boot = OperationalRuntimeService.boot()
+    print("OPERATIONAL RUNTIME STARTED:", boot["state"])
+    counter = 0
+    start = time.time()
+    try:
+        while True:
+            counter += 1
+            OperationalRuntimeService.submit_work(
+                {"payload": {"temperature": 20 + (counter % 10), "signal": "OK"}},
+                priority=5,
+            )
+            status = OperationalRuntimeService.status()
+            print(
+                f"tick={status['heartbeat']['heartbeat_tick']} "
+                f"accepted={status['counters'].get('tasks_accepted')} "
+                f"completed={status['counters'].get('tasks_completed')} "
+                f"pending={status['queue']['pending']} state={status['state']}"
+            )
+            if duration and (time.time() - start) >= duration:
+                break
+            time.sleep(1.0)
+    except KeyboardInterrupt:
+        print("\nInterrupt received — shutting down gracefully")
+    finally:
+        result = OperationalRuntimeService.shutdown()
+        print("OPERATIONAL RUNTIME STOPPED:", result["state"])
+
+
+def run_smoke():
+    """Automated continuous-runtime smoke test with readiness proof."""
+    import time
+
+    from services.operational_runtime_service import OperationalRuntimeService
+
+    boot = OperationalRuntimeService.boot()
+    assert boot["state"] == "RUNNING", boot
+    for i in range(1, 31):
+        OperationalRuntimeService.submit_work(
+            {"payload": {"temperature": 20 + (i % 10), "signal": "OK"}}, priority=4
+        )
+    OperationalRuntimeService.submit_work(
+        {"event_type": "CORRUPTED_EVENT", "payload": {"temperature": None}}, priority=1
+    )
+    from runtime.background_runtime_engine import get_engine
+
+    get_engine().drain_until_idle(timeout=15)
+    time.sleep(1.5)
+    status = OperationalRuntimeService.status()
+    readiness = OperationalRuntimeService.readiness()
+    OperationalRuntimeService.shutdown()
+    print("SMOKE RESULT")
+    print(json.dumps({
+        "engine_state_after_work": status["state"],
+        "heartbeat_alive": status["heartbeat"]["alive"],
+        "tasks_accepted": status["counters"].get("tasks_accepted"),
+        "tasks_completed": status["counters"].get("tasks_completed"),
+        "tasks_invalid": status["counters"].get("tasks_invalid"),
+        "readiness_score": readiness["score"],
+        "readiness_grade": readiness["grade"],
+    }, indent=4))
+
+
 def run_demo():
     result = RuntimeService.execute_demo()
 
@@ -74,7 +147,16 @@ if __name__ == "__main__":
         "--mode",
         type=str,
         default="live",
-        choices=["live", "replay", "recover", "verify", "demo", "ledger", "inject", "manifest"],
+        choices=[
+            "live", "replay", "recover", "verify", "demo", "ledger", "inject",
+            "manifest", "operate", "smoke",
+        ],
+    )
+    parser.add_argument(
+        "--duration",
+        type=float,
+        default=0.0,
+        help="For --mode operate: seconds to run before stopping (0 = until Ctrl+C)",
     )
     args = parser.parse_args()
     print(f"\nRUNNING MODE: {args.mode}\n")
@@ -95,3 +177,7 @@ if __name__ == "__main__":
         run_inject()
     elif args.mode == "manifest":
         run_manifest()
+    elif args.mode == "operate":
+        run_operate(duration=args.duration)
+    elif args.mode == "smoke":
+        run_smoke()

@@ -1,0 +1,106 @@
+{
+  "proof": "OPERATIONAL_RUNTIME_EXECUTION",
+  "generated_at": "2026-06-30T11:01:58.129490+00:00",
+  "engine_state": "RUNNING",
+  "heartbeat_alive": true,
+  "heartbeat_tick": 2,
+  "workers_alive": 4,
+  "counters": {
+    "tasks_accepted": 41,
+    "tasks_completed": 40,
+    "tasks_failed": 0,
+    "tasks_invalid": 1
+  },
+  "scheduler_dispatched": 41,
+  "last_recovery": {
+    "prior_state": "STOPPED",
+    "stopped_cleanly": true,
+    "unclean_shutdown_detected": false,
+    "restored_pending_tasks": 0,
+    "recovered": false,
+    "prior_counters": {
+      "tasks_accepted": 41,
+      "tasks_completed": 40,
+      "tasks_failed": 0,
+      "tasks_invalid": 1
+    },
+    "prior_heartbeat_tick": 0
+  },
+  "readiness": {
+    "score": 9.5,
+    "max": 10,
+    "grade": "PRODUCTION_READY",
+    "earned_weight": 9.5,
+    "total_weight": 10.0,
+    "contributors": [
+      {
+        "signal": "startup_validation",
+        "passed": true,
+        "weight": 1.5,
+        "detail": "READY"
+      },
+      {
+        "signal": "engine_running",
+        "passed": true,
+        "weight": 2.0,
+        "detail": "state=RUNNING"
+      },
+      {
+        "signal": "heartbeat_alive",
+        "passed": true,
+        "weight": 1.5,
+        "detail": "tick=2"
+      },
+      {
+        "signal": "subsystem_health",
+        "passed": true,
+        "weight": 1.5,
+        "detail": "DEGRADED"
+      },
+      {
+        "signal": "dependencies",
+        "passed": true,
+        "weight": 1.5,
+        "detail": "4/4"
+      },
+      {
+        "signal": "audit_chain_intact",
+        "passed": true,
+        "weight": 1.0,
+        "detail": "entries=41"
+      },
+      {
+        "signal": "degradation_mode",
+        "passed": true,
+        "weight": 0.5,
+        "detail": "mode=NORMAL"
+      },
+      {
+        "signal": "low_anomaly_rate",
+        "passed": false,
+        "weight": 0.5,
+        "detail": "rate=0.65"
+      }
+    ]
+  },
+  "confidence": {
+    "confidence": 0.892,
+    "sample": 100,
+    "min": 0.2,
+    "grade": "NOMINAL"
+  },
+  "anomaly_count": 65,
+  "anomaly_rate": 0.65,
+  "audit_chain": {
+    "entries": 41,
+    "intact": true,
+    "broken_at": null,
+    "head_hash": "6f84cf140fc9b5371deb9e820aca6e74784cd73e6924b00f41ede6590a35d6cc"
+  },
+  "intelligence_summary": {
+    "dependency_nodes": 151,
+    "dependency_edges": 150,
+    "lineage_traces": 6,
+    "context_aware_recovery": "TARGETED_RECOVERY"
+  }
+}

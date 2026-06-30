@@ -94,3 +94,52 @@ Dataset Generation → Validation → Serialization → Hashing → Persistence 
 - Health Monitoring: PASSED
 - Startup Validation: PASSED
 - Observability Generation: PASSED
+
+---
+
+## Operational Runtime Backbone (Operational C5ISR Sprint)
+
+The platform now runs as a **continuously operating operational runtime
+backbone**, not only a runtime-proof system. See
+`docs/OPERATIONAL_RUNTIME_ARCHITECTURE.md`.
+
+### New layers
+
+| Layer | Location | Count |
+|-------|----------|-------|
+| Runtime engine (Phase 1) | `runtime/` | 7 modules |
+| Generic capabilities (Phase 2) | `capabilities/` | 13 modules |
+| Runtime intelligence (Phase 3) | `intelligence/` | 10 services |
+| Command center (Phase 4) | `backend/api/routes/operations.py`, `frontend .../CommandCenter.tsx` | live surfaces |
+| Hardening (Phase 6) | `config/`, `security/`, `hardening/` | 12 modules |
+| Documentation (Phase 5) | `docs/` | architecture + 10 capability specs + sequence + deployment |
+
+### Operational entry points
+
+```bash
+python run_system.py --mode operate     # continuous runtime (Ctrl+C to stop)
+python run_system.py --mode operate --duration 10   # time-boxed
+python run_system.py --mode smoke        # automated smoke + readiness proof
+```
+
+### Operational proof
+
+| Proof | How |
+|-------|-----|
+| Runtime stays alive until stopped | `--mode operate` heartbeat ticks continuously |
+| Accepts queued work + scheduler dispatches + workers process | `--mode smoke` → accepted/completed counters |
+| Heartbeat updates continuously | `GET /api/operations/status` `heartbeat.tick` rising |
+| State manager reflects state | `GET /api/operations/status` `state` |
+| Restart recovery restores state | `tests/test_operational_runtime.py::test_restart_recovery_detects_unclean_shutdown` |
+| Dashboard shows live state | Command Center section polls every 2s |
+| APIs return real values | All `/api/operations/*` derive from engine state |
+| Operational readiness | `GET /api/operations/readiness` → score/10 |
+
+### Operational status
+
+- Background runtime engine: PASSED (RUNNING, 4 workers, heartbeat alive)
+- Continuous execution: PASSED
+- Restart recovery: PASSED
+- Capability attachment (no core change): PASSED
+- Command center live surfaces: PASSED
+- Operational readiness: 9.5 / 10 (PRODUCTION_READY)

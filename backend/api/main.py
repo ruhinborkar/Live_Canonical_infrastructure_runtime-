@@ -11,9 +11,11 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from backend.api.routes import events, health, runs, runtime  # noqa: E402
+from backend.api.routes import events, health, operations, runs, runtime  # noqa: E402
 from backend.api.websocket import register_observer, websocket_endpoint  # noqa: E402
+from config.runtime_config import RuntimeConfig  # noqa: E402
 from observability.startup_validator import StartupValidator  # noqa: E402
+from services.operational_runtime_service import OperationalRuntimeService  # noqa: E402
 
 app = FastAPI(
     title="Canonical Infrastructure Runtime API",
@@ -39,6 +41,7 @@ app.include_router(health.router, prefix="/api")
 app.include_router(runs.router, prefix="/api")
 app.include_router(events.router, prefix="/api")
 app.include_router(runtime.router, prefix="/api")
+app.include_router(operations.router, prefix="/api")
 app.add_api_websocket_route("/ws", websocket_endpoint)
 
 STATIC_DIR = ROOT / "backend" / "static"
@@ -50,6 +53,13 @@ if STATIC_DIR.exists():
 async def startup() -> None:
     register_observer(asyncio.get_event_loop())
     StartupValidator.validate()
+    if RuntimeConfig.get("autostart_engine", True):
+        OperationalRuntimeService.boot()
+
+
+@app.on_event("shutdown")
+async def shutdown() -> None:
+    OperationalRuntimeService.shutdown()
 
 
 @app.get("/")

@@ -105,3 +105,67 @@ flowchart TD
 | Observability core | 3 | observer, metrics, reporter |
 
 **STATUS:** Single dependency graph — no parallel runtime stacks.
+
+## Operational Runtime Backbone (Operational C5ISR Sprint)
+
+The operational layer is additive and reuses the canonical primitives above —
+no duplication of replay/recovery/ledger/observability.
+
+```mermaid
+flowchart TD
+    API2[backend/api/routes/operations.py] --> ORS[services/operational_runtime_service.py]
+    CLI2[run_system.py --mode operate/smoke] --> ORS
+
+    ORS --> ENG[runtime/background_runtime_engine.py]
+    ENG --> SM[runtime/operational_state_manager.py]
+    ENG --> HB[runtime/runtime_heartbeat.py]
+    ENG --> SCH[runtime/execution_scheduler.py]
+    ENG --> WL[runtime/worker_lifecycle.py]
+    ENG --> GS[runtime/graceful_shutdown.py]
+    ENG --> RR2[runtime/restart_recovery.py]
+    SCH --> TQ[capabilities/task_queue.py]
+    RR2 --> TQ
+
+    ENG --> RV[validation/runtime_validator.py]
+    ENG --> CS[serialization/canonical_serializer.py]
+    ENG --> RH[hashing/runtime_hasher.py]
+    ENG --> AOS[persistence/append_only_store.py]
+    ENG --> TL[ledger/runtime_truth_ledger.py]
+    ENG --> CAPS[capabilities/*]
+    ENG -. post_processor .-> INT[intelligence/*]
+
+    SM --> STE[intelligence/state_transition_engine.py]
+    ORS --> HARD[hardening/* + config/* + security/*]
+    ORS --> RS2[hardening/readiness_score.py]
+```
+
+### Operational module table
+
+| Module | Depends On | Depended On By |
+|--------|------------|----------------|
+| `runtime/background_runtime_engine.py` | state manager, heartbeat, scheduler, workers, shutdown, restart recovery, canonical pipeline, capabilities | `operational_runtime_service`, CLI |
+| `runtime/execution_scheduler.py` | `capabilities/task_queue` | engine, workers |
+| `runtime/worker_lifecycle.py` | scheduler | engine |
+| `runtime/operational_state_manager.py` | `intelligence/state_transition_engine` | engine, heartbeat, readiness, diagnostics |
+| `runtime/restart_recovery.py` | state manager, task queue | engine |
+| `capabilities/*` (13) | persistence, hashing, serialization | engine, service, intelligence |
+| `intelligence/*` (10) | event_loader, live log | service, readiness, engine post-processor |
+| `hardening/*` (10) | observability, intelligence, capabilities | service, readiness, diagnostics |
+| `config/*`, `security/*` | env | engine boot, service |
+| `services/operational_runtime_service.py` | runtime + capabilities + intelligence + hardening | `routes/operations.py`, CLI |
+| `backend/api/routes/operations.py` | operational service | HTTP / dashboard |
+
+### Operational log files
+
+| Log | Writer | Reader |
+|-----|--------|--------|
+| `data/operational_state.json` | state manager | engine, restart recovery, readiness |
+| `data/runtime_queue.json` | task queue | scheduler, restart recovery |
+| `logging/logs/situation_timeline.jsonl` | situation timeline | dashboard, situation API |
+| `logging/logs/alerts.jsonl` | alert pipeline | alerts API |
+| `logging/logs/execution_audit_chain.jsonl` | audit chain | audit verify, diagnostics |
+| `logging/logs/operator_actions.jsonl` | operator actions | operator timeline API |
+| `logging/logs/operational_runtime.jsonl` | structured logger | diagnostics |
+
+**OPERATIONAL STATUS:** one engine, one queue, one state file — the backbone is
+additive over the canonical platform with no parallel stacks.

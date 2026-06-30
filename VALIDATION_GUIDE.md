@@ -211,3 +211,64 @@ python run_system.py --mode verify
 ```
 
 Expected: `TRUTH_MISMATCH`
+
+---
+
+## Operational Runtime Validation (Operational C5ISR Sprint)
+
+Validates the continuously-operating backbone. Full architecture in
+`docs/OPERATIONAL_RUNTIME_ARCHITECTURE.md`.
+
+### 1. Continuous runtime smoke (automated)
+
+```bash
+python run_system.py --mode smoke
+```
+
+Expected JSON: `engine_state_after_work: RUNNING`, `heartbeat_alive: true`,
+`tasks_completed` ≈ `tasks_accepted`, `readiness_grade: PRODUCTION_READY`.
+
+### 2. Continuous runtime (interactive)
+
+```bash
+python run_system.py --mode operate --duration 8
+```
+
+Expected: per-second lines showing `tick=` rising and `completed=` increasing,
+then `OPERATIONAL RUNTIME STOPPED: STOPPED`. Proves the runtime stays alive and
+processes work continuously until intentionally stopped.
+
+### 3. Restart recovery
+
+```bash
+python -m unittest tests.test_operational_runtime.TestOperationalRuntime.test_restart_recovery_detects_unclean_shutdown
+```
+
+Expected: `OK`. Proves an unclean prior shutdown is detected and pending work is
+restored from persisted state.
+
+### 4. API smoke (with API running on :8002)
+
+```bash
+curl http://127.0.0.1:8002/api/operations/status
+curl http://127.0.0.1:8002/api/operations/readiness
+curl http://127.0.0.1:8002/api/operations/situation
+curl -X POST http://127.0.0.1:8002/api/operations/submit -H "Content-Type: application/json" -d "{\"payload\":{\"temperature\":22,\"signal\":\"OK\"}}"
+```
+
+Expected: `state: RUNNING`, `heartbeat.alive: true`, readiness `score`/10, and
+`accepted: true` for submit. All values are real runtime state — no mock data.
+
+### 5. Dashboard routes
+
+Open `http://127.0.0.1:5173` → **Operational Command Center** section shows live
+engine state, queue, readiness, alerts, topology, operator timeline (polls every
+2–5s).
+
+### 6. Full test suite
+
+```bash
+python -m unittest discover -s tests -p "test_*.py"
+```
+
+Expected: `OK` (41 tests).

@@ -1,4 +1,5 @@
 import OperationBar from "../components/OperationBar";
+import CommandCenter from "../features/console/components/CommandCenter";
 import EventExplorer from "../features/console/components/EventExplorer";
 import HeroStatusHeader from "../features/console/components/HeroStatusHeader";
 import PipelineFlowMonitor from "../features/console/components/PipelineFlowMonitor";
@@ -44,6 +45,10 @@ export default function Dashboard() {
               Sync console data
             </button>
           </div>
+        </section>
+
+        <section aria-label="Operational command center">
+          <CommandCenter />
         </section>
 
         <section aria-label="Runtime key performance indicators">
